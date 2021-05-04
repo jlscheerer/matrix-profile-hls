@@ -1,0 +1,7 @@
+.cproject
+.project
+.settings/**
+
+Emulation-HW/**
+Emulation-SW/**
+Hardware/**
