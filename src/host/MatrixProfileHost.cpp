@@ -5,6 +5,8 @@
 #include "cxxopts.hpp"
 #include "optional.hpp"
 #include "host/logger.hpp"
+
+#include "host/OpenCL.hpp"
 #include "host/MatrixProfileHost.hpp"
 
 #include "MatrixProfile.hpp"
@@ -28,55 +30,21 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     // Creates a vector of DATA_SIZE elements with an initial value of 10 and 32
     // using customized allocator for getting buffer alignment to 4k boundary
 
-    std::vector<cl::Device> devices;
     cl::Device device;
-    std::vector<cl::Platform> platforms;
-    bool found_device = false;
-
-    //traversing all Platforms To find Xilinx Platform and targeted
-    //Device in Xilinx Platform
-    cl::Platform::get(&platforms);
-    for(size_t i = 0; (i < platforms.size() ) & (found_device == false) ;i++){
-        cl::Platform platform = platforms[i];
-        std::string platformName = platform.getInfo<CL_PLATFORM_NAME>();
-        if ( platformName == "Xilinx"){
-            devices.clear();
-            platform.getDevices(CL_DEVICE_TYPE_ACCELERATOR, &devices);
-	    if (devices.size()){
-		    device = devices[0];
-		    found_device = true;
-		    break;
-	    }
-        }
-    }
-    if (found_device == false){
-       std::cout << "Error: Unable to find Target Device "
-           << device.getInfo<CL_DEVICE_NAME>() << std::endl;
-       return EXIT_FAILURE;
-    }
+    if(optional<cl::Device> opt = FindDevice())
+    	device = *opt;
+    else return EXIT_FAILURE;
 
     // Creating Context and Command Queue for selected device
     cl::Context context(device);
     cl::CommandQueue q(context, device, CL_QUEUE_PROFILING_ENABLE);
 
-    // Load xclbin
-    std::cout << "Loading: '" << xclbin << "'\n";
-    std::ifstream bin_file(xclbin, std::ifstream::binary);
-    bin_file.seekg (0, bin_file.end);
-    unsigned nb = bin_file.tellg();
-    bin_file.seekg (0, bin_file.beg);
-    char *buf = new char [nb];
-    bin_file.read(buf, nb);
+    cl::Kernel kernel;
+    if(optional<cl::Kernel> opt = MakeKernel(context, device, xclbin, "MatrixProfileKernelTLF"))
+    	kernel = *opt;
+    else return EXIT_FAILURE;
 
-    // Creating Program from Binary File
-    cl::Program::Binaries bins;
-    bins.push_back({buf,nb});
-    devices.resize(1);
-    cl::Program program(context, devices, bins);
-
-    // This call will get the kernel object from program. A kernel is an
-    // OpenCL function that is executed on the FPGA.
-    cl::Kernel krnl_vector_add(program,"MatrixProfileKernelTLF");
+    // TODO: Replace with MakeBuffer/CopyFromHost & CopyToHost
 
     // These commands will allocate memory on the Device. The cl::Buffer objects can
     // be used to reference the memory locations on the device.
@@ -86,10 +54,10 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
 
     //set the kernel Arguments
     int narg=0;
-    krnl_vector_add.setArg(narg++,buffer_a);
-    krnl_vector_add.setArg(narg++,buffer_b);
-    krnl_vector_add.setArg(narg++,buffer_result);
-    krnl_vector_add.setArg(narg++,DATA_SIZE);
+    kernel.setArg(narg++,buffer_a);
+    kernel.setArg(narg++,buffer_b);
+    kernel.setArg(narg++,buffer_result);
+    kernel.setArg(narg++,DATA_SIZE);
 
     //We then need to map our OpenCL buffers to get the pointers
     int *ptr_a = (int *) q.enqueueMapBuffer (buffer_a , CL_TRUE , CL_MAP_WRITE , 0, size_in_bytes);
@@ -106,7 +74,7 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     q.enqueueMigrateMemObjects({buffer_a,buffer_b},0/* 0 means from host*/);
 
     //Launch the Kernel
-    q.enqueueTask(krnl_vector_add);
+    q.enqueueTask(kernel);
 
     // The result of the previous kernel execution will need to be retrieved in
     // order to view the results. This call will transfer the data from FPGA to
