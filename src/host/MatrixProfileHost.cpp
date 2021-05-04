@@ -1,50 +1,19 @@
-/*******************************************************************************
-Vendor: Xilinx
-Associated Filename: vadd.cpp
-Purpose: VITIS vector addition
-
-*******************************************************************************
-Copyright (C) 2019 XILINX, Inc.
-
-This file contains confidential and proprietary information of Xilinx, Inc. and
-is protected under U.S. and international copyright and other intellectual
-property laws.
-
-DISCLAIMER
-This disclaimer is not a license and does not grant any rights to the materials
-distributed herewith. Except as otherwise provided in a valid license issued to
-you by Xilinx, and to the maximum extent permitted by applicable law:
-(1) THESE MATERIALS ARE MADE AVAILABLE "AS IS" AND WITH ALL FAULTS, AND XILINX
-HEREBY DISCLAIMS ALL WARRANTIES AND CONDITIONS, EXPRESS, IMPLIED, OR STATUTORY,
-INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, NON-INFRINGEMENT, OR
-FITNESS FOR ANY PARTICULAR PURPOSE; and (2) Xilinx shall not be liable (whether
-in contract or tort, including negligence, or under any other theory of
-liability) for any loss or damage of any kind or nature related to, arising under
-or in connection with these materials, including for any direct, or any indirect,
-special, incidental, or consequential loss or damage (including loss of data,
-profits, goodwill, or any type of loss or damage suffered as a result of any
-action brought by a third party) even if such damage or loss was reasonably
-foreseeable or Xilinx had been advised of the possibility of the same.
-
-CRITICAL APPLICATIONS
-Xilinx products are not designed or intended to be fail-safe, or for use in any
-application requiring fail-safe performance, such as life-support or safety
-devices or systems, Class III medical devices, nuclear facilities, applications
-related to the deployment of airbags, or any other applications that could lead
-to death, personal injury, or severe property or environmental damage
-(individually and collectively, "Critical Applications"). Customer assumes the
-sole risk and liability of any use of Xilinx products in Critical Applications,
-subject only to applicable laws and regulations governing limitations on product
-liability.
-
-THIS COPYRIGHT NOTICE AND DISCLAIMER MUST BE RETAINED AS PART OF THIS FILE AT
-ALL TIMES.
-
-*******************************************************************************/
 #include <stdlib.h>
 #include <fstream>
 #include <iostream>
+
+#include "cxxopts.hpp"
+#include "optional.hpp"
+#include "host/logger.hpp"
 #include "host/MatrixProfileHost.hpp"
+
+#include "MatrixProfile.hpp"
+
+using tl::optional;
+using Logger::Log;
+using Logger::LogLevel;
+
+const std::string versionName{"0.0.1 - Host Skeleton"};
 
 static const int DATA_SIZE = 4096;
 
@@ -52,16 +21,7 @@ static const std::string error_message =
     "Error: Result mismatch:\n"
     "i = %d CPU result = %d Device result = %d\n";
 
-int main(int argc, char* argv[]) {
-
-    //TARGET_DEVICE macro needs to be passed from gcc command line
-    if(argc != 2) {
-		std::cout << "Usage: " << argv[0] <<" <xclbin>" << std::endl;
-		return EXIT_FAILURE;
-	}
-
-    char* xclbinFilename = argv[1];
-
+int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::string> output){
     // Compute the size of array in bytes
     size_t size_in_bytes = DATA_SIZE * sizeof(int);
 
@@ -100,8 +60,8 @@ int main(int argc, char* argv[]) {
     cl::CommandQueue q(context, device, CL_QUEUE_PROFILING_ENABLE);
 
     // Load xclbin
-    std::cout << "Loading: '" << xclbinFilename << "'\n";
-    std::ifstream bin_file(xclbinFilename, std::ifstream::binary);
+    std::cout << "Loading: '" << xclbin << "'\n";
+    std::ifstream bin_file(xclbin, std::ifstream::binary);
     bin_file.seekg (0, bin_file.end);
     unsigned nb = bin_file.tellg();
     bin_file.seekg (0, bin_file.beg);
@@ -173,5 +133,63 @@ int main(int argc, char* argv[]) {
 
     std::cout << "TEST " << (match ? "FAILED" : "PASSED") << std::endl;
     return (match ? EXIT_FAILURE :  EXIT_SUCCESS);
+}
 
+int main(int argc, char* argv[]) {
+    std::string hostName{argv[0]};
+    cxxopts::Options options(hostName, "Matrix Profile Host - (C++/OpenCL)");
+
+    options.add_options()
+        ("b,xclbin", ".xclbin to load as the kernel [required]", cxxopts::value<std::string>())
+        // specify the input time series to send to the kernel
+        ("i,input", "input file (time series) [required]", cxxopts::value<std::string>())
+        // specify the output file path
+        ("o,output", "output file (matrix profile / matrix profile index)", cxxopts::value<std::string>())
+        // enable verbose output, e.g. show "Initializing OpenCL context..."
+        ("verbose", "increase output verbosity")
+        ("v,version", "prints version information and exits")
+        ("h,help", "shows help message and exits");
+
+    try{
+        auto args{options.parse(argc, argv)};
+
+        if(args.count("help")){
+            std::cout << options.help() << std::endl;
+            return EXIT_SUCCESS;
+        }
+
+        if(args.count("version")){
+            std::cout << versionName << std::endl;
+            return EXIT_SUCCESS;
+        }
+
+        if(!args.count("xclbin")){
+            Log<LogLevel::Error>("--xclbin required\n");
+            std::cout << options.help() << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        if(!args.count("input")){
+            Log<LogLevel::Error>("--input required\n");
+            std::cout << options.help() << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        Logger::Verbose = args.count("verbose");
+
+        std::string xclbin{args["xclbin"].as<std::string>()};
+        std::string input{args["input"].as<std::string>()};
+
+        optional<std::string> output{args.count("output") 
+                                     ? tl::make_optional(args["output"].as<std::string>()) 
+                                     : optional<std::string>{} };
+
+        Log<LogLevel::Info>(xclbin, input);
+
+        return RunMatrixProfileKernel(xclbin, input, output);
+    }catch(const cxxopts::option_not_exists_exception&){
+        Log<LogLevel::Error>("Unknown argument\n");
+        std::cout << options.help() << std::endl;
+        return EXIT_FAILURE;
+    }
 }
