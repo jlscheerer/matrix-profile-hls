@@ -1,40 +1,17 @@
-//------------------------------------------------------------------------------
-//
-// kernel:  vadd
-//
-// Purpose: Demonstrate Vector Add Kernel
-//
+#include "MatrixProfile.hpp"
+#include "kernel/MatrixProfileKernel.hpp"
 
-#define BUFFER_SIZE 256
-#define DATA_SIZE 4096
-//TRIPCOUNT identifier
-const unsigned int c_len = DATA_SIZE / BUFFER_SIZE;
-const unsigned int c_size = BUFFER_SIZE;
+void MatrixProfileKernelTLF(const unsigned int *in1, const unsigned int *in2, unsigned int *out_r, int size) {
+    // Local memory to store vector1
+    unsigned int v1_buffer[BufferSize];
 
-/*
-    Vector Addition Kernel Implementation
-    Arguments:
-        in1   (input)     --> Input Vector1
-        in2   (input)     --> Input Vector2
-        out_r   (output)    --> Output Vector
-        size  (input)     --> Size of Vector in Integer
-*/
-
-extern "C" {
-void MatrixProfileKernelTLF(const unsigned int *in1, // Read-Only Vector 1
-          const unsigned int *in2, // Read-Only Vector 2
-          unsigned int *out_r,     // Output Result
-          int size                 // Size in integer
-) {
-
-    unsigned int v1_buffer[BUFFER_SIZE];   // Local memory to store vector1
-
-    //Per iteration of this loop perform BUFFER_SIZE vector addition
-    for (int i = 0; i < size; i += BUFFER_SIZE) {
+    // per iteration of this loop perform BUFFER_SIZE vector addition
+    for (int i = 0; i < size; i += BufferSize) {
        #pragma HLS LOOP_TRIPCOUNT min=c_len max=c_len
-        int chunk_size = BUFFER_SIZE;
-        //boundary checks
-        if ((i + BUFFER_SIZE) > size)
+        int chunk_size = BufferSize;
+
+        // boundary checks
+        if ((i + BufferSize) > size)
             chunk_size = size - i;
 
         read1: for (int j = 0; j < chunk_size; j++) {
@@ -42,14 +19,11 @@ void MatrixProfileKernelTLF(const unsigned int *in1, // Read-Only Vector 1
             v1_buffer[j] = in1[i + j];
         }
 
-        //Burst reading B and calculating C and Burst writing
-        // to  Global memory
+        // burst reading B and calculating C and Burst writing to  Global memory
         vadd_writeC: for (int j = 0; j < chunk_size; j++) {
            #pragma HLS LOOP_TRIPCOUNT min=c_size max=c_size
-            //perform vector addition
+            // perform vector addition
             out_r[i+j] = v1_buffer[j] + in2[i+j];
         }
-
     }
-}
 }

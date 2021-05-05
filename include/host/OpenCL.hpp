@@ -193,3 +193,5 @@ bool CopyToHost(cl::CommandQueue &queue, const cl::Buffer &buffer, size_t numEle
 
     return true;
 }
+
+// TODO: Create a Context, Kernel, Buffer class

@@ -7,18 +7,15 @@
 #include "optional.hpp"
 #include "host/Logger.hpp"
 
+#include "MatrixProfile.hpp"
 #include "host/OpenCL.hpp"
 #include "host/MatrixProfileHost.hpp"
-
-#include "MatrixProfile.hpp"
 
 using tl::optional;
 using Logger::Log;
 using Logger::LogLevel;
 
-const std::string versionName{"0.0.1 - Host Skeleton"};
-
-static const int DATA_SIZE = 4096;
+static const std::string versionName{"0.0.1 - Host Skeleton"};
 
 static const std::string error_message =
     "Error: Result mismatch:\n"
@@ -32,7 +29,7 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
 
     // Creating Context and Command Queue for selected device
     cl::Context context(device);
-    cl::CommandQueue q(context, device, CL_QUEUE_PROFILING_ENABLE);
+    cl::CommandQueue queue(context, device, CL_QUEUE_PROFILING_ENABLE);
 
     cl::Kernel kernel;
     if(optional<cl::Kernel> opt = MakeKernel(context, device, xclbin, "MatrixProfileKernelTLF"))
@@ -42,15 +39,15 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     // These commands will allocate memory on the Device. The cl::Buffer objects can
     // be used to reference the memory locations on the device.
     cl::Buffer buffer_a, buffer_b, buffer_result;
-    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, DATA_SIZE))
+    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, DataSize))
         buffer_a = *opt;
     else return EXIT_FAILURE;
 
-    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, DATA_SIZE))
+    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, DataSize))
         buffer_b = *opt;
     else return EXIT_FAILURE;
 
-    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Write>(context, DATA_SIZE))
+    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Write>(context, DataSize))
         buffer_result = *opt;
     else return EXIT_FAILURE;
 
@@ -61,18 +58,18 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
         C[i] = 0;
     }
 
-    CopyFromHost<int>(q, buffer_a, A.cbegin(), A.cend());
-    CopyFromHost<int>(q, buffer_b, B.cbegin(), B.cend());
+    CopyFromHost<int>(queue, buffer_a, A.cbegin(), A.cend());
+    CopyFromHost<int>(queue, buffer_b, B.cbegin(), B.cend());
 
     // Set the kernel Arguments
-    SetKernelArguments(kernel, 0, buffer_a, buffer_b, buffer_result, DATA_SIZE);
+    SetKernelArguments(kernel, 0, buffer_a, buffer_b, buffer_result, DataSize);
 
     //Launch the Kernel & wait for it to finish
-    q.enqueueTask(kernel);
-    q.finish();
+    queue.enqueueTask(kernel);
+    queue.finish();
 
     // Data can be transferred back to the host using the read buffer operation
-    CopyToHost<int>(q, buffer_result, DATA_SIZE, C.data());
+    CopyToHost<int>(queue, buffer_result, DataSize, C.data());
 
     //Verify the result
     int match = 0;
@@ -85,7 +82,7 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
         }
     }
 
-    q.finish();
+    queue.finish();
 
     std::cout << "TEST " << (match ? "FAILED" : "PASSED") << std::endl;
     return (match ? EXIT_FAILURE :  EXIT_SUCCESS);
