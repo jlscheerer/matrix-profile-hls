@@ -1,6 +1,7 @@
 .cproject
 .project
 .settings/**
+.vscode/**
 
 Emulation-HW/**
 Emulation-SW/**

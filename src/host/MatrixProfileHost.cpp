@@ -5,7 +5,7 @@
 
 #include "cxxopts.hpp"
 #include "optional.hpp"
-#include "host/logger.hpp"
+#include "host/Logger.hpp"
 
 #include "host/OpenCL.hpp"
 #include "host/MatrixProfileHost.hpp"

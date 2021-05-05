@@ -14,7 +14,7 @@
 
 #include <CL/cl2.hpp>
 
-#include <host/logger.hpp>
+#include <host/Logger.hpp>
 
 #include <optional.hpp>
 
