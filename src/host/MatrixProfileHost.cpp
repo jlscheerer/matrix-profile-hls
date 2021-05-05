@@ -51,8 +51,8 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
         buffer_result = *opt;
     else return EXIT_FAILURE;
 
-    std::array<int, DATA_SIZE> A, B, C;
-    for(int i = 0; i < DATA_SIZE; ++i){
+    std::array<int, DataSize> A, B, C;
+    for(int i = 0; i < DataSize; ++i){
         A[i] = 10;
         B[i] = 20;
         C[i] = 0;
@@ -73,7 +73,7 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
 
     //Verify the result
     int match = 0;
-    for (int i = 0; i < DATA_SIZE; i++) {
+    for (int i = 0; i < DataSize; i++) {
         int host_result = A[i] + B[i];
         if (C[i] != host_result) {
             printf(error_message.c_str(), i, host_result, C[i]);
