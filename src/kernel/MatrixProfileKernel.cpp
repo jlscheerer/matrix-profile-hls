@@ -7,7 +7,8 @@
 
 using hls::stream;
 
-void MemoryToStream(const data_t *T, stream<data_t> &QT, stream<data_t> &df_i, stream<data_t> &df_j, 
+void MemoryToStream(/*const size_t n, const size_t m,*/
+                    const data_t *T, stream<data_t> &QT, stream<data_t> &df_i, stream<data_t> &df_j, 
                     stream<data_t> &dg_i, stream<data_t> &dg_j, stream<data_t> &inv_i, stream<data_t> &inv_j,
 			        stream<data_t> &rowWiseAggregate, stream<data_t> &columnWiseAggregate, 
                     stream<index_t> &rowWiseIndex, stream<index_t> &columnWiseIndex) {
@@ -107,11 +108,12 @@ void MemoryToStream(const data_t *T, stream<data_t> &QT, stream<data_t> &df_i, s
 }
 
 // D = sqrt(2 * m * (1-PearsonCorrelation))
-data_t PearsonCorrelationToEuclideanDistance(const size_t n, const size_t m, data_t PearsonCorrelation) {
+data_t PearsonCorrelationToEuclideanDistance(/*const size_t n, const size_t m,*/ 
+                                             data_t PearsonCorrelation) {
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
-void UpdateProfile(const size_t n, const size_t m, 
+void UpdateProfile(/*const size_t n, const size_t m,*/
                    const data_t PearsonCorrelation, const index_t row, const index_t column,
 			       stream<data_t> &rowWiseAggregate_in, stream<data_t> &columnWiseAggregate_in, 
                    stream<index_t> &rowWiseIndex_in, stream<index_t> &columnWiseIndex_in, 
@@ -151,7 +153,8 @@ void UpdateProfile(const size_t n, const size_t m,
 
 }
 
-void ComputeMatrixProfile(const size_t n, const size_t m, const size_t stage, 
+void ComputeMatrixProfile(/*const size_t n, const size_t m,*/
+                          const size_t stage, 
                           stream<data_t> &QT_in, stream<data_t> &df_i_in, stream<data_t> &dg_i_in, 
                           stream<data_t> &df_j_in, stream<data_t> &dg_j_in, stream<data_t> &inv_i_in, stream<data_t> &inv_j_in,
 
@@ -181,9 +184,10 @@ void ComputeMatrixProfile(const size_t n, const size_t m, const size_t stage,
     data_t PearsonCorrelation = QT * inv_i * inv_j;
 
     index_t row = 0, column = stage;
-    UpdateProfile(n, m, PearsonCorrelation, row, column, rowWiseAggregate_in, columnWiseAggregate_in,
-            rowWiseIndex_in, columnWiseIndex_in, rowWiseAggregate_out, columnWiseAggregate_out, rowWiseIndex_out,
-            columnWiseIndex_out);
+    UpdateProfile(/*n, m, */
+                  PearsonCorrelation, row, column, rowWiseAggregate_in, columnWiseAggregate_in,
+                  rowWiseIndex_in, columnWiseIndex_in, rowWiseAggregate_out, columnWiseAggregate_out, rowWiseIndex_out,
+                  columnWiseIndex_out);
 
     // Push along the pipeline
     inv_i_out.write(inv_i);
@@ -226,9 +230,10 @@ void ComputeMatrixProfile(const size_t n, const size_t m, const size_t stage,
 
         // Pass on aggregates (update if required)
         row = t + 1; column = stage + t + 1;
-        UpdateProfile(n, m, PearsonCorrelation, row, column, rowWiseAggregate_in, columnWiseAggregate_in,
-                rowWiseIndex_in, columnWiseIndex_in, rowWiseAggregate_out, columnWiseAggregate_out,
-                rowWiseIndex_out, columnWiseIndex_out);
+        UpdateProfile(/*n, m,*/
+                      PearsonCorrelation, row, column, rowWiseAggregate_in, columnWiseAggregate_in,
+                      rowWiseIndex_in, columnWiseIndex_in, rowWiseAggregate_out, columnWiseAggregate_out,
+                      rowWiseIndex_out, columnWiseIndex_out);
 
         // can push everything because first element not in the loop
         inv_j_out.write(inv_j);
@@ -256,11 +261,11 @@ void ComputeMatrixProfile(const size_t n, const size_t m, const size_t stage,
     }
 }
 
-void StreamToMemory(const size_t n, const size_t m, 
+void StreamToMemory(/*const size_t n, const size_t m,*/ 
                     Stream<data_t> &rowWiseAggregate, Stream<data_t> &columnWiseAggregate, 
                     Stream<index_t> &rowWiseIndex, Stream<index_t> &columnWiseIndex,
 			        data_t *MP, index_t *MPI) {
-    for (int i = 0; i < n - m + 1; ++i) {
+    for (int i = 0; i < rs_len; ++i) {
         data_t rowAggregate = rowWiseAggregate.read();
         index_t row = rowWiseIndex.read();
 
@@ -269,10 +274,10 @@ void StreamToMemory(const size_t n, const size_t m,
 
         // Take the max of both row/column & Convert from PearsonCorrelation to Euclidean Distance
         if (rowAggregate > columnAggregate) {
-            MP[i] = PearsonCorrelationToEuclideanDistance(n, m, rowAggregate);
+            MP[i] = PearsonCorrelationToEuclideanDistance(/*n, m,*/ rowAggregate);
             MPI[i] = row;
         } else {
-            MP[i] = PearsonCorrelationToEuclideanDistance(n, m, columnAggregate);
+            MP[i] = PearsonCorrelationToEuclideanDistance(/*n, m,*/ columnAggregate);
             MPI[i] = column;
         }
     }
@@ -301,16 +306,16 @@ void MatrixProfileKernelTLF(const size_t n, const size_t m,
     stream<index_t> rowWiseIndex[numStages + 1];
     stream<index_t> columnWiseIndex[numStages + 1];
 
-    MemoryToStream(n, m, T, QT[0], df_i[0], df_j[0], dg_i[0], dg_j[0], inv_i[0], inv_j[0], 
+    MemoryToStream(/*n, m,*/ T, QT[0], df_i[0], df_j[0], dg_i[0], dg_j[0], inv_i[0], inv_j[0], 
                    rowWiseAggregate[0], columnWiseAggregate[0], rowWiseIndex[0], columnWiseIndex[0]);
 
     for (int k = 0; k < numStages; ++k)
-        ComputeMatrixProfile(n, m, k, QT[k], df_i[k], dg_i[k], df_j[k], dg_j[k], inv_i[k], inv_j[k],
+        ComputeMatrixProfile(/*n, m,*/ k, QT[k], df_i[k], dg_i[k], df_j[k], dg_j[k], inv_i[k], inv_j[k],
                              rowWiseAggregate[k], columnWiseAggregate[k], rowWiseIndex[k], columnWiseIndex[k], 
                              QT[k + 1], df_i[k + 1], dg_i[k + 1], df_j[k + 1], dg_j[k + 1], inv_i[k + 1], inv_j[k + 1],
                              rowWiseAggregate[k + 1], columnWiseAggregate[k + 1], rowWiseIndex[k + 1], columnWiseIndex[k + 1]);
 
-    StreamToMemory(n, m, rowWiseAggregate[numStages], columnWiseAggregate[numStages], 
+    StreamToMemory(/*n, m,*/ rowWiseAggregate[numStages], columnWiseAggregate[numStages], 
                    rowWiseIndex[numStages], columnWiseIndex[numStages], MP, MPI);
 
     // Deplete Pipeline Completely (inv_i is always passed along, needs to be "popped" explicitly)
