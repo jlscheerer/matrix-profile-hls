@@ -66,9 +66,10 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     CopyToHost<int>(queue, sinkBuffer, DataSize, sink.data());
 
     //Verify the result
-    for (int i = 0; i < DataSize; i++) {
+    for (int i = 0; i < 10; i++) {
         std::cout << sink[i] << " ";
     }
+
     std::cout << std::endl;
 
     queue.finish();
