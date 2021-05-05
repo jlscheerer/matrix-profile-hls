@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 
 #include <CL/cl2.hpp>
 
@@ -20,6 +21,8 @@
 using tl::optional;
 using Logger::Log;
 using Logger::LogLevel;
+
+enum class Access { Read, Write, ReadWrite };
 
 optional<cl::Device> FindDevice(){
     // Traverse all available Platforms to find Xilinx Platform and targeted Device
@@ -100,4 +103,93 @@ optional<cl::Kernel> MakeKernel(const cl::Context &context, const cl::Device &de
     }
 
     return tl::make_optional(kernel);
+}
+
+template<typename IteratorType, typename T>
+constexpr bool IsIteratorOfType() {
+  return std::is_same<typename std::iterator_traits<IteratorType>::value_type,
+                      T>::value;
+}
+
+template<typename IteratorType>
+constexpr bool IsRandomAccess() {
+  return std::is_base_of<
+      std::random_access_iterator_tag,
+      typename std::iterator_traits<IteratorType>::iterator_category>::value;
+}
+
+template<typename T, Access access>
+optional<cl::Buffer> MakeBuffer(const cl::Context &context, size_t numElements){
+	cl_int errorCode; cl_mem_flags flags;
+
+    switch (access) {
+	  case Access::Read:
+		flags = CL_MEM_READ_ONLY;
+		break;
+	  case Access::Write:
+		flags = CL_MEM_WRITE_ONLY;
+		break;
+	  case Access::ReadWrite:
+		flags = CL_MEM_READ_WRITE;
+		break;
+	}
+
+    cl::Buffer buffer(context, flags, numElements * sizeof(T), nullptr, &errorCode);
+
+    if(errorCode != CL_SUCCESS){
+    	Log<LogLevel::Error>("Failed to initialize device memory.");
+    	return optional<cl::Buffer>{};
+    }
+
+    return tl::make_optional(buffer);
+}
+
+template<typename T>
+bool SetKernelArguments(cl::Kernel &kernel, size_t index, T &&arg){
+    cl_int errorCode = kernel.setArg(index, arg);
+    if(errorCode != CL_SUCCESS){
+        Log<LogLevel::Error>("Failed to set kernel argument", index);
+        return false;
+    }
+    return true;
+}
+
+template<typename T, typename... Ts>
+bool SetKernelArguments(cl::Kernel &kernel, size_t index, T &&arg, Ts &&... args){
+    if(!SetKernelArguments(kernel, index, std::forward<T>(arg)))
+        return false;
+    return SetKernelArguments(kernel, index+1, std::forward<Ts>(args)...);
+}
+
+template<typename T, typename IteratorType, typename = typename
+         std::enable_if<IsIteratorOfType<IteratorType, T>() && IsRandomAccess<IteratorType>()>::type>
+bool CopyFromHost(cl::CommandQueue &queue, const cl::Buffer &buffer, IteratorType begin, IteratorType end){
+    auto numElements = std::distance(begin, end);
+    T *hostPtr = const_cast<T*>(&(*begin));
+
+    // enqueueWriteBuffer() API call is a request to enqueue a write operation. This
+    // API call does not immediately initiate the data transfer. The data transfer happens
+    // when a kernel is enqueued which has the respective buffer as one of its arguments.
+    cl_int errorCode = queue.enqueueWriteBuffer(buffer, CL_TRUE, 0, numElements * sizeof(T), hostPtr);
+
+    if(errorCode != CL_SUCCESS){
+        Log<LogLevel::Error>("Failed to copy data to device.");
+        return false;
+    }
+
+    return true;
+}
+
+template<typename T, typename IteratorType, typename = typename
+         std::enable_if<IsIteratorOfType<IteratorType, T>() && IsRandomAccess<IteratorType>()>::type>
+bool CopyToHost(cl::CommandQueue &queue, const cl::Buffer &buffer, size_t numElements, IteratorType target){
+    // Data can be transferred back to the host using the read buffer operation
+    cl_int errorCode = queue.enqueueReadBuffer(buffer, CL_TRUE, 0, numElements * sizeof(T), &(*target));
+
+    if(errorCode != CL_SUCCESS){
+        Log<LogLevel::Error>("Failed top copy data from device.");
+        return false;
+    }
+
+    return true;
 }

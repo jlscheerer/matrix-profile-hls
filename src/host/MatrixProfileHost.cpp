@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <fstream>
 #include <iostream>
+#include <array>
 
 #include "cxxopts.hpp"
 #include "optional.hpp"
@@ -24,12 +25,6 @@ static const std::string error_message =
     "i = %d CPU result = %d Device result = %d\n";
 
 int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::string> output){
-    // Compute the size of array in bytes
-    size_t size_in_bytes = DATA_SIZE * sizeof(int);
-
-    // Creates a vector of DATA_SIZE elements with an initial value of 10 and 32
-    // using customized allocator for getting buffer alignment to 4k boundary
-
     cl::Device device;
     if(optional<cl::Device> opt = FindDevice())
     	device = *opt;
@@ -44,59 +39,52 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     	kernel = *opt;
     else return EXIT_FAILURE;
 
-    // TODO: Replace with MakeBuffer/CopyFromHost & CopyToHost
-
     // These commands will allocate memory on the Device. The cl::Buffer objects can
     // be used to reference the memory locations on the device.
-    cl::Buffer buffer_a(context, CL_MEM_READ_ONLY, size_in_bytes);
-    cl::Buffer buffer_b(context, CL_MEM_READ_ONLY, size_in_bytes);
-    cl::Buffer buffer_result(context, CL_MEM_WRITE_ONLY, size_in_bytes);
+    cl::Buffer buffer_a, buffer_b, buffer_result;
+    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, DATA_SIZE))
+        buffer_a = *opt;
+    else return EXIT_FAILURE;
 
-    //set the kernel Arguments
-    int narg=0;
-    kernel.setArg(narg++,buffer_a);
-    kernel.setArg(narg++,buffer_b);
-    kernel.setArg(narg++,buffer_result);
-    kernel.setArg(narg++,DATA_SIZE);
+    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, DATA_SIZE))
+        buffer_b = *opt;
+    else return EXIT_FAILURE;
 
-    //We then need to map our OpenCL buffers to get the pointers
-    int *ptr_a = (int *) q.enqueueMapBuffer (buffer_a , CL_TRUE , CL_MAP_WRITE , 0, size_in_bytes);
-    int *ptr_b = (int *) q.enqueueMapBuffer (buffer_b , CL_TRUE , CL_MAP_WRITE , 0, size_in_bytes);
-    int *ptr_result = (int *) q.enqueueMapBuffer (buffer_result , CL_TRUE , CL_MAP_READ , 0, size_in_bytes);
+    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Write>(context, DATA_SIZE))
+        buffer_result = *opt;
+    else return EXIT_FAILURE;
 
-    //setting input data
-    for(int i = 0 ; i< DATA_SIZE; i++){
-	    ptr_a[i] = 10;
-	    ptr_b[i] = 20;
+    std::array<int, DATA_SIZE> A, B, C;
+    for(int i = 0; i < DATA_SIZE; ++i){
+        A[i] = 10;
+        B[i] = 20;
+        C[i] = 0;
     }
 
-    // Data will be migrated to kernel space
-    q.enqueueMigrateMemObjects({buffer_a,buffer_b},0/* 0 means from host*/);
+    CopyFromHost<int>(q, buffer_a, A.cbegin(), A.cend());
+    CopyFromHost<int>(q, buffer_b, B.cbegin(), B.cend());
 
-    //Launch the Kernel
+    // Set the kernel Arguments
+    SetKernelArguments(kernel, 0, buffer_a, buffer_b, buffer_result, DATA_SIZE);
+
+    //Launch the Kernel & wait for it to finish
     q.enqueueTask(kernel);
-
-    // The result of the previous kernel execution will need to be retrieved in
-    // order to view the results. This call will transfer the data from FPGA to
-    // source_results vector
-    q.enqueueMigrateMemObjects({buffer_result},CL_MIGRATE_MEM_OBJECT_HOST);
-
     q.finish();
+
+    // Data can be transferred back to the host using the read buffer operation
+    CopyToHost<int>(q, buffer_result, DATA_SIZE, C.data());
 
     //Verify the result
     int match = 0;
     for (int i = 0; i < DATA_SIZE; i++) {
-        int host_result = ptr_a[i] + ptr_b[i];
-        if (ptr_result[i] != host_result) {
-            printf(error_message.c_str(), i, host_result, ptr_result[i]);
+        int host_result = A[i] + B[i];
+        if (C[i] != host_result) {
+            printf(error_message.c_str(), i, host_result, C[i]);
             match = 1;
             break;
         }
     }
 
-    q.enqueueUnmapMemObject(buffer_a , ptr_a);
-    q.enqueueUnmapMemObject(buffer_b , ptr_b);
-    q.enqueueUnmapMemObject(buffer_result , ptr_result);
     q.finish();
 
     std::cout << "TEST " << (match ? "FAILED" : "PASSED") << std::endl;

@@ -3,12 +3,16 @@
   <configuration name="Emulation-SW" id="com.xilinx.accelerated.config.sw_emu.aarch64.865702520">
     <configBuildOptions xsi:type="openclProject:OpenCLOptions" kernelDebug="true">
       <binaryContainers name="mp-binary-container">
-        <kernels name="MatrixProfileKernelTLF" sourceFile="src/kernel/MatrixProfileKernel.cpp"/>
+        <kernels name="MatrixProfileKernelTLF" sourceFile="src/kernel/MatrixProfileKernel.cpp">
+          <computeUnits name="MatrixProfileKernelTLF_1" slr=""/>
+        </kernels>
       </binaryContainers>
     </configBuildOptions>
     <lastBuildOptions xsi:type="openclProject:OpenCLOptions" kernelDebug="true">
       <binaryContainers name="mp-binary-container">
-        <kernels name="MatrixProfileKernelTLF" sourceFile="src/kernel/MatrixProfileKernel.cpp"/>
+        <kernels name="MatrixProfileKernelTLF" sourceFile="src/kernel/MatrixProfileKernel.cpp">
+          <computeUnits name="MatrixProfileKernelTLF_1" slr=""/>
+        </kernels>
       </binaryContainers>
     </lastBuildOptions>
   </configuration>
