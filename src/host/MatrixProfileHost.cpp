@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <array>
@@ -39,19 +39,19 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     // These commands will allocate memory on the Device. The cl::Buffer objects can
     // be used to reference the memory locations on the device.
     cl::Buffer buffer_T, buffer_MP, buffer_MPI;
-    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, n))
+    if(optional<cl::Buffer> opt = MakeBuffer<data_t, Access::Read>(context, n))
         buffer_T = *opt;
     else return EXIT_FAILURE;
 
-    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Write>(context, rs_len))
+    if(optional<cl::Buffer> opt = MakeBuffer<data_t, Access::Write>(context, rs_len))
         buffer_MP = *opt;
     else return EXIT_FAILURE;
 
-    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Write>(context, rs_len))
+    if(optional<cl::Buffer> opt = MakeBuffer<index_t, Access::Write>(context, rs_len))
         buffer_MPI = *opt;
     else return EXIT_FAILURE;
 
-    // TODO load actual input file containg time series
+    // TODO load actual input file containing time series
     
     std::array<data_t, n> host_T;
     host_T[0] = 1; host_T[1] = 4; host_T[2] = 9; host_T[3] = 16; host_T[4] = 25; host_T[5] = 36; host_T[6] = 49; host_T[7] = 64;
@@ -72,6 +72,16 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     // Read resulting Matrix Profile and Matrix Profile Index
     CopyToHost<data_t>(queue, buffer_MP, rs_len, host_MP.data());
     CopyToHost<index_t>(queue, buffer_MPI, rs_len, host_MPI.data());
+
+    std::cout << "MP:";
+    for(size_t i = 0; i < rs_len; ++i)
+    	std::cout << "\t" << host_MP[i];
+    std::cout << std::endl;
+
+    std::cout << "MPI:";
+    for(size_t i = 0; i < rs_len; ++i)
+        std::cout << "\t" << host_MPI[i];
+    std::cout << std::endl;
 
     queue.finish();
 

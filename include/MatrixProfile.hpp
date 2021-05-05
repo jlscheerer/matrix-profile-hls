@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdlib>
 
 // type alias for time series & resulting matrix profile
 using data_t = double;
