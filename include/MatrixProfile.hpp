@@ -15,3 +15,9 @@ static constexpr size_t m = 4;
 
 // length of the resulting matrix profile (index)
 static constexpr size_t rs_len = n - m + 1;
+
+// "negative infinity" used to initialize aggregates
+static constexpr data_t aggregate_init = -1e12;
+
+// used to indicate an invalid/undetermined index
+static constexpr index_t index_init = -1;
