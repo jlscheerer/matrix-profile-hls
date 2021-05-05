@@ -38,39 +38,40 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
 
     // These commands will allocate memory on the Device. The cl::Buffer objects can
     // be used to reference the memory locations on the device.
-    cl::Buffer sourceBuffer, sinkBuffer;
-    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, DataSize))
-        sourceBuffer = *opt;
+    cl::Buffer buffer_T, buffer_MP, buffer_MPI;
+    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, n))
+        buffer_T = *opt;
     else return EXIT_FAILURE;
 
-    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Write>(context, DataSize))
-        sinkBuffer = *opt;
+    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Write>(context, rs_len))
+        buffer_MP = *opt;
     else return EXIT_FAILURE;
 
-    std::array<int, DataSize> source, sink;
-    for(int i = 0; i < DataSize; ++i){
-        source[i] = 10;
-        sink[i] = 0;
-    }
+    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Write>(context, rs_len))
+        buffer_MPI = *opt;
+    else return EXIT_FAILURE;
 
-    CopyFromHost<int>(queue, sourceBuffer, source.cbegin(), source.cend());
+    // TODO load actual input file containg time series
+    
+    std::array<data_t, n> host_T;
+    host_T[0] = 1; host_T[1] = 4; host_T[2] = 9; host_T[3] = 16; host_T[4] = 25; host_T[5] = 36; host_T[6] = 49; host_T[7] = 64;
 
-    // Set the kernel Arguments
-    SetKernelArguments(kernel, 0, sourceBuffer, sinkBuffer, DataSize);
+    std::array<data_t, rs_len> host_MP;
+    std::array<index_t, rs_len> host_MPI;
+
+    // Copy Time Series to the FPGA
+    CopyFromHost<data_t>(queue, buffer_T, host_T.cbegin(), host_T.cend());
+
+    // Set the Kernel Arguments
+    SetKernelArguments(kernel, 0, n, m, buffer_T, buffer_MP, buffer_MPI);
 
     // Launch the Kernel & wait for it to finish
     queue.enqueueTask(kernel);
     queue.finish();
 
-    // Data can be transferred back to the host using the read buffer operation
-    CopyToHost<int>(queue, sinkBuffer, DataSize, sink.data());
-
-    //Verify the result
-    for (int i = 0; i < 10; i++) {
-        std::cout << sink[i] << " ";
-    }
-
-    std::cout << std::endl;
+    // Read resulting Matrix Profile and Matrix Profile Index
+    CopyToHost<data_t>(queue, buffer_MP, rs_len, host_MP.data());
+    CopyToHost<index_t>(queue, buffer_MPI, rs_len, host_MPI.data());
 
     queue.finish();
 
