@@ -28,7 +28,6 @@ void StreamToMemory(stream<unsigned int> &stream, unsigned int *memory, int size
     }
 }
 
-extern "C"{
 void MatrixProfileKernelTLF(const unsigned int *memoryIn, unsigned int *memoryOut, int size) {
     #pragma HLS DATAFLOW
     stream<unsigned int> streams[NumberOfStages + 1];
@@ -44,5 +43,4 @@ void MatrixProfileKernelTLF(const unsigned int *memoryIn, unsigned int *memoryOu
 
     // write final stream back to memory
     StreamToMemory(streams[NumberOfStages], memoryOut, size);
-}
 }
