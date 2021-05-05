@@ -106,28 +106,6 @@ void MemoryToStream(const data_t *T, stream<data_t> &QT, stream<data_t> &df_i, s
     }
 }
 
-void StreamToMemory(const size_t n, const size_t m, 
-                    Stream<data_t> &rowWiseAggregate, Stream<data_t> &columnWiseAggregate, 
-                    Stream<index_t> &rowWiseIndex, Stream<index_t> &columnWiseIndex,
-			        data_t *MP, index_t *MPI) {
-    for (int i = 0; i < n - m + 1; ++i) {
-        data_t rowAggregate = rowWiseAggregate.read();
-        index_t row = rowWiseIndex.read();
-
-        data_t columnAggregate = columnWiseAggregate.read();
-        index_t column = columnWiseIndex.read();
-
-        // Take the max of both row/column & Convert from PearsonCorrelation to Euclidean Distance
-        if (rowAggregate > columnAggregate) {
-            MP[i] = PearsonCorrelationToEuclideanDistance(n, m, rowAggregate);
-            MPI[i] = row;
-        } else {
-            MP[i] = PearsonCorrelationToEuclideanDistance(n, m, columnAggregate);
-            MPI[i] = column;
-        }
-    }
-}
-
 // D = sqrt(2 * m * (1-PearsonCorrelation))
 data_t PearsonCorrelationToEuclideanDistance(const size_t n, const size_t m, data_t PearsonCorrelation) {
     return sqrt(2 * m * (1 - PearsonCorrelation));
@@ -275,6 +253,28 @@ void ComputeMatrixProfile(const size_t n, const size_t m, const size_t stage,
         rowWiseAggregate_out.write(aggregate);
         index_t aggregateIndex = rowWiseIndex_in.read();
         rowWiseIndex_out.write(aggregateIndex);
+    }
+}
+
+void StreamToMemory(const size_t n, const size_t m, 
+                    Stream<data_t> &rowWiseAggregate, Stream<data_t> &columnWiseAggregate, 
+                    Stream<index_t> &rowWiseIndex, Stream<index_t> &columnWiseIndex,
+			        data_t *MP, index_t *MPI) {
+    for (int i = 0; i < n - m + 1; ++i) {
+        data_t rowAggregate = rowWiseAggregate.read();
+        index_t row = rowWiseIndex.read();
+
+        data_t columnAggregate = columnWiseAggregate.read();
+        index_t column = columnWiseIndex.read();
+
+        // Take the max of both row/column & Convert from PearsonCorrelation to Euclidean Distance
+        if (rowAggregate > columnAggregate) {
+            MP[i] = PearsonCorrelationToEuclideanDistance(n, m, rowAggregate);
+            MPI[i] = row;
+        } else {
+            MP[i] = PearsonCorrelationToEuclideanDistance(n, m, columnAggregate);
+            MPI[i] = column;
+        }
     }
 }
 
