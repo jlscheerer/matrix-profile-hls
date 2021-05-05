@@ -1,29 +1,46 @@
 #include "MatrixProfile.hpp"
 #include "kernel/MatrixProfileKernel.hpp"
 
-void MatrixProfileKernelTLF(const unsigned int *in1, const unsigned int *in2, unsigned int *out_r, int size) {
-    // Local memory to store vector1
-    unsigned int v1_buffer[BufferSize];
+#include "hls_stream.h"
 
-    // per iteration of this loop perform BUFFER_SIZE vector addition
-    for (int i = 0; i < size; i += BufferSize) {
-       #pragma HLS LOOP_TRIPCOUNT min=c_len max=c_len
-        int chunk_size = BufferSize;
+using hls::stream;
 
-        // boundary checks
-        if ((i + BufferSize) > size)
-            chunk_size = size - i;
-
-        read1: for (int j = 0; j < chunk_size; j++) {
-           #pragma HLS LOOP_TRIPCOUNT min=c_size max=c_size
-            v1_buffer[j] = in1[i + j];
-        }
-
-        // burst reading B and calculating C and Burst writing to  Global memory
-        vadd_writeC: for (int j = 0; j < chunk_size; j++) {
-           #pragma HLS LOOP_TRIPCOUNT min=c_size max=c_size
-            // perform vector addition
-            out_r[i+j] = v1_buffer[j] + in2[i+j];
-        }
+void MemoryToStream(const unsigned int *memory, stream<unsigned int> &stream, int size){
+    MemoryToStream:
+    for(int i = 0; i < size; ++i){
+        stream << memory[i];
     }
+}
+
+void AddStage(stream<unsigned int> &streamIn, stream<unsigned int> &streamOut, int size){
+    AddStage:
+    for(int i = 0; i < size; ++i){
+        const unsigned int element = stream.read();
+        const unsigned int result = element + 1;
+        streamOut << result;
+    }
+}
+
+void StreamToMemory(stream<unsigned int> &stream, unsigned int *memory, int size){
+    StreamToMemory:
+    for(int i = 0; i < size; ++i){
+        memory[i] = stream.read();
+    }
+}
+
+void MatrixProfileKernelTLF(const unsigned int *memoryIn, unsigned int *memoryOut, int size) {
+    #pragma HLS DATAFLOW
+    stream<unsigned int> streams[NumberOfStages + 1];
+    
+    // read memory into initial stream
+    MemoryToStream(memoryIn, streams[0], size);
+
+    // connect successive compute units
+    for(int k = 0; k < NumberOfStages; ++k){
+        #pragma HLS UNROLL
+        AddStage(streams[k], streams[k+1], size);
+    }
+
+    // write final stream back to memory
+    StreamToMemory(streams[NumberOfStages], memoryOut);
 }

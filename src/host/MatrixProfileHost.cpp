@@ -38,54 +38,42 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
 
     // These commands will allocate memory on the Device. The cl::Buffer objects can
     // be used to reference the memory locations on the device.
-    cl::Buffer buffer_a, buffer_b, buffer_result;
+    cl::Buffer sourceBuffer, sinkBuffer;
     if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, DataSize))
-        buffer_a = *opt;
-    else return EXIT_FAILURE;
-
-    if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Read>(context, DataSize))
-        buffer_b = *opt;
+        sourceBuffer = *opt;
     else return EXIT_FAILURE;
 
     if(optional<cl::Buffer> opt = MakeBuffer<int, Access::Write>(context, DataSize))
-        buffer_result = *opt;
+        sinkBuffer = *opt;
     else return EXIT_FAILURE;
 
-    std::array<int, DataSize> A, B, C;
+    std::array<int, DataSize> source, sink;
     for(int i = 0; i < DataSize; ++i){
-        A[i] = 10;
-        B[i] = 20;
-        C[i] = 0;
+        source[i] = 10;
+        sink[i] = 0;
     }
 
-    CopyFromHost<int>(queue, buffer_a, A.cbegin(), A.cend());
-    CopyFromHost<int>(queue, buffer_b, B.cbegin(), B.cend());
+    CopyFromHost<int>(queue, sourceBuffer, source.cbegin(), source.cend());
 
     // Set the kernel Arguments
-    SetKernelArguments(kernel, 0, buffer_a, buffer_b, buffer_result, DataSize);
+    SetKernelArguments(kernel, 0, sourceBuffer, sinkBuffer, DataSize);
 
-    //Launch the Kernel & wait for it to finish
+    // Launch the Kernel & wait for it to finish
     queue.enqueueTask(kernel);
     queue.finish();
 
     // Data can be transferred back to the host using the read buffer operation
-    CopyToHost<int>(queue, buffer_result, DataSize, C.data());
+    CopyToHost<int>(queue, sinkBuffer, DataSize, sink.data());
 
     //Verify the result
-    int match = 0;
     for (int i = 0; i < DataSize; i++) {
-        int host_result = A[i] + B[i];
-        if (C[i] != host_result) {
-            printf(error_message.c_str(), i, host_result, C[i]);
-            match = 1;
-            break;
-        }
+        std::cout << sink[i] << " ";
     }
+    std::cout << std::endl;
 
     queue.finish();
 
-    std::cout << "TEST " << (match ? "FAILED" : "PASSED") << std::endl;
-    return (match ? EXIT_FAILURE :  EXIT_SUCCESS);
+    return EXIT_SUCCESS;
 }
 
 int main(int argc, char* argv[]) {
