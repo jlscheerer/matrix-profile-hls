@@ -72,7 +72,7 @@ void MemoryToStream(/*const size_t n, const size_t m,*/
         // dg[i - m + 1] = (T_i - mean) + (T_r - prev_mean);
         data_t dg = (T_i - mean) + (T_r - prev_mean);
         dg_i.write(dg);
-        dg_j.write(dgl);
+        dg_j.write(dg);
 
         inv_sum = 0;
         qt_sum = 0;
@@ -262,8 +262,8 @@ void ComputeMatrixProfile(/*const size_t n, const size_t m,*/
 }
 
 void StreamToMemory(/*const size_t n, const size_t m,*/ 
-                    Stream<data_t> &rowWiseAggregate, Stream<data_t> &columnWiseAggregate, 
-                    Stream<index_t> &rowWiseIndex, Stream<index_t> &columnWiseIndex,
+                    stream<data_t> &rowWiseAggregate, stream<data_t> &columnWiseAggregate, 
+                    stream<index_t> &rowWiseIndex, stream<index_t> &columnWiseIndex,
 			        data_t *MP, index_t *MPI) {
     for (int i = 0; i < rs_len; ++i) {
         data_t rowAggregate = rowWiseAggregate.read();
