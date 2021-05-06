@@ -126,7 +126,7 @@ void UpdateProfile(/*const size_t n, const size_t m,*/
     index_t columnIndex = columnWiseIndex_in.read();
     
     // (i-m/4 ≤ j ≤ i+m/4)
-    bool exclusionZoneRow = (row - m / 4) <= column && column <= (row + m / 4);
+    bool exclusionZoneRow = (row - static_cast<int>(m) / 4) <= column && column <= (row + static_cast<int>(m) / 4);
 
     if (!exclusionZoneRow && PearsonCorrelation > rowAggregate) {
         // update to "remember" best column in the current row
@@ -139,7 +139,7 @@ void UpdateProfile(/*const size_t n, const size_t m,*/
     }
 
     // (j-m/4 ≤ i ≤ j+m/4)
-    bool exclusionZoneColumn = (column - m / 4) <= row && row <= (column + m / 4);
+    bool exclusionZoneColumn = (column - static_cast<int>(m) / 4) <= row && row <= (column + static_cast<int>(m) / 4);
 
     if (!exclusionZoneColumn && PearsonCorrelation > columnAggregate) {
         // update to "remember" best row in the current column
