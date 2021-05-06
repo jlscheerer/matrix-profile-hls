@@ -166,6 +166,7 @@ void ComputeMatrixProfile(/*const size_t n, const size_t m,*/
 
 			              stream<data_t> &rowWiseAggregate_out, stream<data_t> &columnWiseAggregate_out,
 			              stream<index_t> &rowWiseIndex_out, stream<index_t> &columnWiseIndex_out) {
+
     // Push Current Aggregate along (not affected by current compute unit)
     for (int i = 0; i < stage; ++i) {
         data_t aggregate = columnWiseAggregate_in.read();
@@ -245,11 +246,13 @@ void ComputeMatrixProfile(/*const size_t n, const size_t m,*/
             dg_i_out.write(dg_i);
             inv_i_out.write(inv_i);
         }
+
         if (t != 0) {
             // Push Everything Except first j
             df_j_out.write(df_j);
             dg_j_out.write(dg_j);
         }
+
     }
 
     // Push Aggregate along
@@ -259,6 +262,7 @@ void ComputeMatrixProfile(/*const size_t n, const size_t m,*/
         index_t aggregateIndex = rowWiseIndex_in.read();
         rowWiseIndex_out.write(aggregateIndex);
     }
+
 }
 
 void StreamToMemory(/*const size_t n, const size_t m,*/ 
@@ -285,6 +289,7 @@ void StreamToMemory(/*const size_t n, const size_t m,*/
 
 void MatrixProfileKernelTLF(const size_t n, const size_t m, 
                             const data_t *T, data_t *MP, index_t *MPI) {
+	#pragma HLS DATAFLOW
     const size_t numStages = rs_len;
 
     // Streams required to calculate Correlations
@@ -309,11 +314,13 @@ void MatrixProfileKernelTLF(const size_t n, const size_t m,
     MemoryToStream(/*n, m,*/ T, QT[0], df_i[0], df_j[0], dg_i[0], dg_j[0], inv_i[0], inv_j[0], 
                    rowWiseAggregate[0], columnWiseAggregate[0], rowWiseIndex[0], columnWiseIndex[0]);
 
-    for (int k = 0; k < numStages; ++k)
+    for (int k = 0; k < rs_len; ++k){
+		#pragma HLS UNROLL
         ComputeMatrixProfile(/*n, m,*/ k, QT[k], df_i[k], dg_i[k], df_j[k], dg_j[k], inv_i[k], inv_j[k],
                              rowWiseAggregate[k], columnWiseAggregate[k], rowWiseIndex[k], columnWiseIndex[k], 
                              QT[k + 1], df_i[k + 1], dg_i[k + 1], df_j[k + 1], dg_j[k + 1], inv_i[k + 1], inv_j[k + 1],
                              rowWiseAggregate[k + 1], columnWiseAggregate[k + 1], rowWiseIndex[k + 1], columnWiseIndex[k + 1]);
+    }
 
     StreamToMemory(/*n, m,*/ rowWiseAggregate[numStages], columnWiseAggregate[numStages], 
                    rowWiseIndex[numStages], columnWiseIndex[numStages], MP, MPI);
