@@ -15,64 +15,45 @@ using tl::optional;
 using Logger::Log;
 using Logger::LogLevel;
 
-static const std::string versionName{"0.0.1 - Host Skeleton"};
-
-static const std::string error_message =
-    "Error: Result mismatch:\n"
-    "i = %d CPU result = %d Device result = %d\n";
+using OpenCL::Access;
 
 int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::string> output){
-    cl::Device device;
-    if(optional<cl::Device> opt = FindDevice())
-    	device = *opt;
-    else return EXIT_FAILURE;
-
-    // Creating Context and Command Queue for selected device
-    cl::Context context(device);
-    cl::CommandQueue queue(context, device, CL_QUEUE_PROFILING_ENABLE);
-
-    cl::Kernel kernel;
-    if(optional<cl::Kernel> opt = MakeKernel(context, device, xclbin, "MatrixProfileKernelTLF"))
-    	kernel = *opt;
-    else return EXIT_FAILURE;
-
-    // These commands will allocate memory on the Device. The cl::Buffer objects can
-    // be used to reference the memory locations on the device.
-    cl::Buffer buffer_T, buffer_MP, buffer_MPI;
-    if(optional<cl::Buffer> opt = MakeBuffer<data_t, Access::Read>(context, n))
-        buffer_T = *opt;
-    else return EXIT_FAILURE;
-
-    if(optional<cl::Buffer> opt = MakeBuffer<data_t, Access::Write>(context, rs_len))
-        buffer_MP = *opt;
-    else return EXIT_FAILURE;
-
-    if(optional<cl::Buffer> opt = MakeBuffer<index_t, Access::Write>(context, rs_len))
-        buffer_MPI = *opt;
-    else return EXIT_FAILURE;
-
-    // TODO load actual input file containing time series
-    
+    // Allocate Host-Side Memory
     std::array<data_t, n> host_T;
-    host_T[0] = 1; host_T[1] = 4; host_T[2] = 9; host_T[3] = 16; host_T[4] = 25; host_T[5] = 36; host_T[6] = 49; host_T[7] = 64;
-
     std::array<data_t, rs_len> host_MP;
     std::array<index_t, rs_len> host_MPI;
 
-    // Copy Time Series to the FPGA
-    CopyFromHost<data_t>(queue, buffer_T, host_T.cbegin(), host_T.cend());
+    // TODO load actual input file containing time series
+    host_T[0] = 1; host_T[1] = 4; host_T[2] = 9; host_T[3] = 16; host_T[4] = 25; host_T[5] = 36; host_T[6] = 49; host_T[7] = 64;
+    
+    OpenCL::Context context;
 
-    // Set the Kernel Arguments
-    SetKernelArguments(kernel, 0, n, m, buffer_T, buffer_MP, buffer_MPI);
+    // These commands will allocate memory on the Device. The cl::Buffer objects can
+    // be used to reference the memory locations on the device.
+    OpenCL::Buffer<data_t, Access::ReadOnly> buffer_T{
+        context.MakeBuffer<data_t, Access::ReadOnly>(n)
+    };
+    OpenCL::Buffer<data_t, Access::WriteOnly> buffer_MP{
+        context.MakeBuffer<data_t, Access::WriteOnly>(rs_len)
+    };
+    OpenCL::Buffer<index_t, Access::WriteOnly> buffer_MPI{
+        context.MakeBuffer<index_t, Access::WriteOnly>(rs_len)
+    };
 
-    // Launch the Kernel & wait for it to finish
-    queue.enqueueTask(kernel);
-    queue.finish();
+    OpenCL::Program program{context.MakeProgram(xclbin)};
 
-    // Read resulting Matrix Profile and Matrix Profile Index
-    CopyToHost<data_t>(queue, buffer_MP, rs_len, host_MP.data());
-    CopyToHost<index_t>(queue, buffer_MPI, rs_len, host_MPI.data());
+    OpenCL::Kernel kernel{
+        program.MakeKernel(KernelTLF, n, m, buffer_T, buffer_MP, buffer_MPI)
+    };
 
+    buffer_T.CopyFromHost(host_T.cbegin(), host_T.cend());
+
+    kernel.ExecuteTask();
+
+    buffer_MP.CopyToHost(host_MP.data());
+    buffer_MPI.CopyToHost(host_MPI.data());
+
+    // TODO Actually write MP/MPI to disk
     std::cout << "MP:";
     for(size_t i = 0; i < rs_len; ++i)
     	std::cout << "\t" << host_MP[i];
@@ -82,8 +63,6 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     for(size_t i = 0; i < rs_len; ++i)
         std::cout << "\t" << host_MPI[i];
     std::cout << std::endl;
-
-    queue.finish();
 
     return EXIT_SUCCESS;
 }

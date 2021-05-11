@@ -289,7 +289,7 @@ void StreamToMemory(/*const size_t n, const size_t m,*/
 
 void MatrixProfileKernelTLF(const size_t n, const size_t m,
                             const data_t *T, data_t *MP, index_t *MPI) {
-	#pragma HLS DATAFLOW
+    #pragma HLS DATAFLOW
     const size_t numStages = rs_len;
 
     // Streams required to calculate Correlations
@@ -315,7 +315,7 @@ void MatrixProfileKernelTLF(const size_t n, const size_t m,
                    rowWiseAggregate[0], columnWiseAggregate[0], rowWiseIndex[0], columnWiseIndex[0]);
 
     for (int k = 0; k < rs_len; ++k){
-		#pragma HLS UNROLL
+        #pragma HLS UNROLL
         ComputeMatrixProfile(/*n, m,*/ k, QT[k], df_i[k], dg_i[k], df_j[k], dg_j[k], inv_i[k], inv_j[k],
                              rowWiseAggregate[k], columnWiseAggregate[k], rowWiseIndex[k], columnWiseIndex[k],
                              QT[k + 1], df_i[k + 1], dg_i[k + 1], df_j[k + 1], dg_j[k + 1], inv_i[k + 1], inv_j[k + 1],

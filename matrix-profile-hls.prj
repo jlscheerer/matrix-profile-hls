@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="ASCII"?>
 <openclProject:OpenCLProject xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openclProject="http://www.xilinx.com/openclproject" name="matrix-profile-hls" location="/u/home/scheerer/workspace/matrix-profile-hls" platform="/opt/xilinx/platforms/xilinx_zcu102_base_202010_1/xilinx_zcu102_base_202010_1.xpfm" platformUID="xilinx:zcu102:zcu102_base:1.0" systemProject="matrix-profile-hls_system" sysConfig="xilinx_zcu102_base_202010_1" cpu="xrt" cpuInstance="cortex-a53" os="linux">
-  <configuration name="Emulation-SW" id="com.xilinx.accelerated.config.sw_emu.aarch64.865702520">
+  <configuration name="Emulation-SW" id="com.xilinx.accelerated.config.sw_emu.aarch64.865702520" dirty="true">
     <configBuildOptions xsi:type="openclProject:OpenCLOptions" kernelDebug="true">
       <binaryContainers name="mp_binary_container">
         <kernels name="MatrixProfileKernelTLF" sourceFile="src/kernel/MatrixProfileKernel.cpp">
