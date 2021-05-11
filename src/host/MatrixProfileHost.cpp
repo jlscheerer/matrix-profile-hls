@@ -8,8 +8,10 @@
 #include "host/Logger.hpp"
 
 #include "MatrixProfile.hpp"
-#include "host/OpenCL.hpp"
+
 #include "host/MatrixProfileHost.hpp"
+#include "host/OpenCL.hpp"
+#include "host/FileIO.hpp"
 
 using tl::optional;
 using Logger::Log;
@@ -23,9 +25,11 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     std::array<data_t, rs_len> host_MP;
     std::array<index_t, rs_len> host_MPI;
 
-    // TODO load actual input file containing time series
-    host_T[0] = 1; host_T[1] = 4; host_T[2] = 9; host_T[3] = 16; host_T[4] = 25; host_T[5] = 36; host_T[6] = 49; host_T[7] = 64;
-    
+    // cwd: /media/sd-mmcblk0p1
+    // Load Input File Containing Time Series Data into Host Memory
+    if(!ReadBinaryFile<data_t>("data/binary/small8_syn.tsb", host_T))
+        return EXIT_FAILURE;
+
     OpenCL::Context context;
 
     // These commands will allocate memory on the Device. The cl::Buffer objects can
@@ -54,6 +58,10 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     buffer_MPI.CopyToHost(host_MPI.data());
 
     // TODO Actually write MP/MPI to disk
+
+    if(!WriteBinaryFile<data_t>("output.mpb", host_MP))
+        return EXIT_FAILURE;
+
     std::cout << "MP:";
     for(size_t i = 0; i < rs_len; ++i)
     	std::cout << "\t" << host_MP[i];

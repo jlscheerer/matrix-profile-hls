@@ -3,7 +3,7 @@ import os
 import struct
 import argparse
 
-# support types for the binary files
+# supported types for the binary files
 # https://docs.python.org/3/library/struct.html
 types = {'double': ('d', 8, float), 'int': ('i', 4, int)}
 default_type = 'double'
@@ -27,7 +27,7 @@ def read_bin(filename, type = None, n = None):
     except:
         log(f'Cannot determine size of file "{filename}"', LogTypeError)
         exit(-1)
-    # attempt to automatically determine number of elements
+    # attempt to automatically determine the number of elements
     if n == None:
         log('Attempting to automatically determine the number of elements (n)', LogTypeVerbose)
         if size % length != 0:
