@@ -2,16 +2,18 @@
 #include <fstream>
 #include <iostream>
 #include <array>
+#include <chrono>
 
 #include "cxxopts.hpp"
 #include "optional.hpp"
-#include "host/Logger.hpp"
 
 #include "MatrixProfile.hpp"
 
 #include "host/MatrixProfileHost.hpp"
 #include "host/OpenCL.hpp"
 #include "host/FileIO.hpp"
+#include "host/Timer.hpp"
+#include "host/Logger.hpp"
 
 using tl::optional;
 using Logger::Log;
@@ -25,9 +27,10 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     std::array<data_t, rs_len> host_MP;
     std::array<index_t, rs_len> host_MPI;
 
+    // TODO: Actually respect the provided output parameter
     // cwd: /media/sd-mmcblk0p1
     // Load Input File Containing Time Series Data into Host Memory
-    if(!ReadBinaryFile<data_t>("data/binary/small8_syn.tsb", host_T))
+    if(!FileIO::ReadBinaryFile<data_t>("data/binary/small8_syn.tsb", host_T))
         return EXIT_FAILURE;
 
     OpenCL::Context context;
@@ -52,25 +55,21 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
 
     buffer_T.CopyFromHost(host_T.cbegin(), host_T.cend());
 
-    kernel.ExecuteTask();
+    std::chrono::nanoseconds executionTime{kernel.ExecuteTask()};
+
+    Log<LogLevel::Info>("Kernel completed successfully in", executionTime);
 
     buffer_MP.CopyToHost(host_MP.data());
     buffer_MPI.CopyToHost(host_MPI.data());
 
-    // TODO Actually write MP/MPI to disk
-
-    if(!WriteBinaryFile<data_t>("output.mpb", host_MP))
+    // TODO: Actually respect the provided output parameter
+    // Write the Matrix Profile to disk
+    if(!FileIO::WriteBinaryFile<data_t>("output.mpb", host_MP))
         return EXIT_FAILURE;
 
-    std::cout << "MP:";
-    for(size_t i = 0; i < rs_len; ++i)
-    	std::cout << "\t" << host_MP[i];
-    std::cout << std::endl;
-
-    std::cout << "MPI:";
-    for(size_t i = 0; i < rs_len; ++i)
-        std::cout << "\t" << host_MPI[i];
-    std::cout << std::endl;
+    // Write the Matrix Profile Index to disk
+    if(!FileIO::WriteBinaryFile<index_t>("output.mpib", host_MPI))
+        return EXIT_FAILURE;
 
     return EXIT_SUCCESS;
 }
@@ -123,8 +122,6 @@ int main(int argc, char* argv[]) {
         optional<std::string> output{args.count("output") 
                                      ? tl::make_optional(args["output"].as<std::string>()) 
                                      : optional<std::string>{} };
-
-        Log<LogLevel::Info>(xclbin, input);
 
         return RunMatrixProfileKernel(xclbin, input, output);
     }catch(const cxxopts::option_not_exists_exception&){

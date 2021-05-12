@@ -11,13 +11,15 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <chrono>
 #include <stdexcept>
 
 #include <CL/cl2.hpp>
 
-#include <host/Logger.hpp>
+#include "host/Timer.hpp"
+#include "host/Logger.hpp"
 
-#include <optional.hpp>
+#include "optional.hpp"
 
 template<typename IteratorType, typename T>
 constexpr bool IsIteratorOfType() {
@@ -165,7 +167,7 @@ namespace OpenCL{
         public:
             Kernel(Program &program, const std::string &name);
 
-            void ExecuteTask();
+            std::chrono::nanoseconds ExecuteTask();
 
             ~Kernel();
         private:
@@ -299,10 +301,13 @@ namespace OpenCL{
             throw RuntimeError("Failed to create kernel with name '" + name + "'");
     }
 
-    void Kernel::ExecuteTask(){
-        // TODO: Return Execution Time
+    std::chrono::nanoseconds Kernel::ExecuteTask(){
         m_program->commandQueue().enqueueTask(m_kernel);
+        // Record time required for execution
+        Timer timer;
         m_program->commandQueue().finish();
+        // Return the execution time
+        return timer.Elapsed();
     }
 
     Kernel::~Kernel(){}
