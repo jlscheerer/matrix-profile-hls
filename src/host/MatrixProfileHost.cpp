@@ -50,7 +50,7 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     OpenCL::Program program{context.MakeProgram(xclbin)};
 
     OpenCL::Kernel kernel{
-        program.MakeKernel(KernelTLF, n, m, buffer_T, buffer_MP, buffer_MPI)
+        program.MakeKernel(KernelTLF, buffer_T, buffer_MP, buffer_MPI)
     };
 
     buffer_T.CopyFromHost(host_T.cbegin(), host_T.cend());
