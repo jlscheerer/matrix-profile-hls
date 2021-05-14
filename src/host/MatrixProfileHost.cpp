@@ -27,7 +27,7 @@ int RunMatrixProfileKernel(std::string xclbin, std::string input, optional<std::
     std::array<data_t, rs_len> host_MP;
     std::array<index_t, rs_len> host_MPI;
 
-    // TODO: Actually respect the provided output parameter
+    // TODO: Actually respect the provided input parameter
     // cwd: /media/sd-mmcblk0p1
     // Load Input File Containing Time Series Data into Host Memory
     if(!FileIO::ReadBinaryFile<data_t>("data/binary/small8_syn.tsb", host_T))
