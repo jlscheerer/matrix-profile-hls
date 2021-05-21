@@ -12,23 +12,28 @@
 void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data_t (&df)[rs_len], data_t (&dg)[rs_len], data_t (&inv)[rs_len], 
                                      data_t (&QT)[rs_len], data_t (&P)[rs_len], data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
                                      data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len]) {
-    data_t mean = 0;
-    data_t inv_sum = 0;
-    data_t qt_sum = 0;
-
     // use T_m as shift register containing the previous m T elements
     // need to be able to access these elements with no contention
     data_t T_m[m];
+    #pragma HLS ARRAY_PARTITION variable=T_m complete
 
     // the first m T values, required for convolution
     data_t Ti_m[m];
+    #pragma HLS ARRAY_PARTITION variable=Ti_m complete
 
-    PrecomputationInitTM:
+    PrecomputationInitT:
     for (size_t i = 0; i < m; ++i) {
+        #pragma HLS pipeline II=1
         data_t T_i = T[i];
-        mean += T_i;
         T_m[i] = T_i;
         Ti_m[i] = T_i;
+    }
+
+    data_t mean = 0;
+    PrecomputationInitMu:
+    for(size_t i = 0; i < m; ++i){
+        #pragma HLS unroll
+        mean += T_m[i];
     }
     mean /= m;
 
@@ -38,9 +43,11 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     df[0] = 0;
     dg[0] = 0;
 
-    // TODO: unroll this loop
+    data_t inv_sum = 0;
+    data_t qt_sum = 0;
     PrecomputationInitInvQT:
     for (size_t k = 0; k < m; ++k) {
+        #pragma HLS unroll
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
     }
@@ -56,16 +63,18 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     columnAggregateIndex[0] = index_init;
 
     data_t prev_mean;
-    
     PrecomputationCompute:
-     for (size_t i = m; i < n; ++i) {
+    for (size_t i = m; i < n; ++i) {
+        #pragma HLS pipeline II=1
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
+        #if 0
         // set and update mean
         prev_mean = mean;
         mean = mean + (T_i - T_r) / m;
         mu[i - m + 1] = mean;
+        #endif
 
         // calculate df: (T[i+m-1] - T[i-1]) / 2
         df[i - m + 1] = (T_i - T_r) / 2;
@@ -75,9 +84,9 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
         inv_sum = 0;
         qt_sum = 0;
 
-        // needs to be unrolled but then not to difficult
         PrecomputationComputeUpdateInvQT:
         for (size_t k = 1; k < m; k++) {
+            #pragma HLS unroll
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
         }
@@ -97,12 +106,11 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
         columnAggregate[i - m + 1] = aggregate_init;
         columnAggregateIndex[i - m + 1] = index_init;
 
-        // shift all values in T to the left (if unrolled not difficult)
         PrecomputationComputeShift: 
         for (size_t k = 0; k < m - 1; ++k){
+            #pragma HLS unroll
             T_m[k] = T_m[k + 1];
         }
-
         T_m[m - 1] = T_i;
     }
 }
