@@ -1,5 +1,12 @@
+/**
+ * @file    OpenCL.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   OpenCL Wrapper (Context, Buffer<T, Access>, Program, Kernel)
+ */
+
 #pragma once
 
+// Xilinx provided Configuration Values
 #define CL_HPP_CL_1_2_DEFAULT_BUILD
 #define CL_HPP_TARGET_OPENCL_VERSION 120
 #define CL_HPP_MINIMUM_OPENCL_VERSION 120

@@ -1,3 +1,9 @@
+/**
+ * @file    MatrixProfile.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   Constant Definitions (n, m) and Type Aliases (data_t, index_t)
+ */
+
 #pragma once
 #include <cstdlib>
 

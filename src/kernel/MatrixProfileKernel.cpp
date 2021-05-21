@@ -1,3 +1,9 @@
+/**
+ * @file    MatrixProfileKernel.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   Implementation of the Kernel (C++/Vitis HLS)
+ */
+
 #include "MatrixProfile.hpp"
 #include "kernel/MatrixProfileKernel.hpp"
 

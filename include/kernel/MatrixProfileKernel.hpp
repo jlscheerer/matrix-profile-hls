@@ -1,3 +1,9 @@
+/**
+ * @file    MatrixProfileKernel.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   Declaration of the MatrixProfileKernel Signature
+ */
+
 #pragma once
 #include <cstdlib>
 

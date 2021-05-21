@@ -1,3 +1,9 @@
+/**
+ * @file    FileIO.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   Utility for reading and writing Binary Files
+ */
+
 #pragma once
 
 #include <fstream>

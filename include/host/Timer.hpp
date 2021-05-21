@@ -1,3 +1,9 @@
+/**
+ * @file    Timer.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   Utility for Tracking Execution Times
+ */
+
 #pragma once
 
 #include <chrono>

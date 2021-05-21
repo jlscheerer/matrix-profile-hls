@@ -1,4 +1,8 @@
-/// @author    Jan Luca Scheerer (scheerer@cs.tum.edu)
+/**
+ * @file    Logger.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   Logging Functionality
+ */
 
 #pragma once
 #include <iostream>
