@@ -37,7 +37,7 @@ static constexpr data_t aggregate_init = -1e12;
 static constexpr index_t index_init = -1;
 
 // "translate" the selected kernel implementation (type) to a readable string
-#if KERNEL_IMPLENTATION == KERNEL_STREAMLESS
+#if KERNEL_IMPLEMENTATION == KERNEL_STREAMLESS
     #define KERNEL_IMPL_NAME "vStreamless"
 #elif KERNEL_IMPLEMENTATION == KERNEL_STREAM1D
     #define KERNEL_IMPL_NAME "vStream-1D"

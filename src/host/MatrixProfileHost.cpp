@@ -93,7 +93,20 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
         // Write the Matrix Profile Index to disk
         if(!FileIO::WriteBinaryFile<index_t>((*output) + ".mpib", host_MPI))
             return EXIT_FAILURE;
+    }else{
+        // Just output the result to the console (for debugging)
+        std::cout << "MP:";
+        for(size_t i = 0; i < rs_len; ++i)
+    	    std::cout << " " << host_MP[i];
+        std::cout << std::endl;
+
+        std::cout << "MPI:";
+        for(size_t i = 0; i < rs_len; ++i)
+            std::cout << " " << host_MPI[i];
+        std::cout << std::endl;
     }
+
+    Log<LogLevel::Verbose>("Terminating Host.");
 
     return EXIT_SUCCESS;
 }

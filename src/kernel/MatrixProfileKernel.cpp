@@ -4,9 +4,11 @@
  * @brief   Includes the selected Implementation of the Kernel (C++/Vitis HLS)
  */
 
+#include "MatrixProfile.hpp"
+
 // Select the Kernel Implementation based on the KERNEL_IMPLEMENTATION 
 // macro. Set this macro in "include/MatrixProfile.hpp"
-#if KERNEL_IMPLENTATION == KERNEL_STREAMLESS
+#if KERNEL_IMPLEMENTATION == KERNEL_STREAMLESS
     #include "MatrixProfileKernelStreamless.cpp"
 #elif KERNEL_IMPLEMENTATION == KERNEL_STREAM1D
     #include "MatrixProfileKernelStream1D.cpp"
