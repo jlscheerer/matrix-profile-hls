@@ -23,7 +23,8 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     // the first m T values, required for convolution
     data_t Ti_m[m];
 
-    for (int i = 0; i < m; ++i) {
+    PrecomputationInitTM:
+    for (size_t i = 0; i < m; ++i) {
         data_t T_i = T[i];
         mean += T_i;
         T_m[i] = T_i;
@@ -38,7 +39,8 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     dg[0] = 0;
 
     // TODO: unroll this loop
-    for (int k = 0; k < m; ++k) {
+    PrecomputationInitInvQT:
+    for (size_t k = 0; k < m; ++k) {
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
     }
@@ -54,7 +56,9 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     columnAggregateIndex[0] = index_init;
 
     data_t prev_mean;
-    for (int i = m; i < n; ++i) {
+    
+    PrecomputationCompute:
+     for (size_t i = m; i < n; ++i) {
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
@@ -72,7 +76,8 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
         qt_sum = 0;
 
         // needs to be unrolled but then not to difficult
-        for (int k = 1; k < m; k++) {
+        PrecomputationComputeUpdateInvQT:
+        for (size_t k = 1; k < m; k++) {
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
         }
@@ -93,19 +98,23 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
         columnAggregateIndex[i - m + 1] = index_init;
 
         // shift all values in T to the left (if unrolled not difficult)
-        for (int k = 0; k < m - 1; ++k)
+        PrecomputationComputeShift: 
+        for (size_t k = 0; k < m - 1; ++k){
             T_m[k] = T_m[k + 1];
+        }
+
         T_m[m - 1] = T_i;
     }
 }
 
-void UpdateAggregates(int row, data_t (&P)[rs_len], data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
+void UpdateAggregates(size_t row, data_t (&P)[rs_len], data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
                       data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len]) {
     // P each iteration (row) P contains one less valid value (upper-triangular matrix)
     data_t rowMax = aggregate_init;
     index_t rowMaxIndex = index_init;
 
-    for (int column = row; column < n - m + 1; ++column) {
+    UpdateAggregateCompute:
+    for (size_t column = row; column < n - m + 1; ++column) {
         // check if we are in the exclusion Zone
         // exlusionZone <==> row - m/4 <= column <= row + m/4
         // 				<==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
@@ -131,7 +140,8 @@ data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
 void ReductionComputionElement(data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
                                data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len], data_t *MP, index_t *MPI) {
     // Just always take the max
-    for (int i = 0; i < n - m + 1; ++i) {
+    ReductionCompute:
+    for (size_t i = 0; i < n - m + 1; ++i) {
         data_t rowValue = rowAggregate[i];
         index_t rowIndex = rowAggregateIndex[i];
         data_t colValue = columnAggregate[i];
@@ -161,9 +171,13 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     UpdateAggregates(0, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
 
     // Do the actual calculations via updates
-    for (int row = 1; row < n - m + 1; ++row) {
+    MatrixProfileComputeRow:
+    for (size_t row = 1; row < n - m + 1; ++row) {
+        
         data_t dfi = df[row]; data_t dgi = dg[row]; data_t invi = inv[row];
-        for (int k = 0; k < n - m + 1 - row; ++k) {
+        
+        MatrixProfileComputeColumn:
+        for (size_t k = 0; k < n - m + 1 - row; ++k) {
             // column = k + row
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
@@ -172,6 +186,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
             P[k] = QT[k] * invi * inv[k + row];
         }
+
         // Update Aggregates for the current row
         // TODO: Instead of this inline function directly into upper body
         UpdateAggregates(row, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
