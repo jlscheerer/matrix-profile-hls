@@ -59,6 +59,8 @@ namespace OpenCL{
 
     enum class Access { ReadOnly, WriteOnly, ReadWrite };
 
+    enum class MemoryBank { Unspecified, MemoryBank0, MemoryBank1, MemoryBank2, MemoryBank3 };
+
     class Program;
 
     class Kernel;
@@ -75,6 +77,9 @@ namespace OpenCL{
             template<typename T, Access access>
             Buffer<T, access> MakeBuffer(size_t size);
 
+            template<typename T, Access access>
+            Buffer<T, access> MakeBuffer(MemoryBank memoryBank, size_t size);
+
             // Returns the internal OpenCL command queue.
             inline cl::CommandQueue const &commandQueue() const { return m_queue; }
 
@@ -89,28 +94,25 @@ namespace OpenCL{
             cl::Context m_context;
             cl::CommandQueue m_queue;
             cl::Device m_device;
+
             static cl::Device FindDevice();
     };
 
     template<typename T, Access access>
     class Buffer{
         public:
-            Buffer(Context &context, size_t size): m_context(&context), m_size(size){
-                cl_int errorCode; cl_mem_flags flags;
 
-                switch (access) {
-                    case Access::ReadOnly:
-                        flags = CL_MEM_READ_ONLY;
-                        break;
-                    case Access::WriteOnly:
-                        flags = CL_MEM_WRITE_ONLY;
-                        break;
-                    case Access::ReadWrite:
-                        flags = CL_MEM_READ_WRITE;
-                        break;
+            Buffer(Context &context, MemoryBank memoryBank, size_t size)
+                : m_context(&context), m_memoryBank(memoryBank), m_size(size) {
+                cl_int errorCode; cl_mem_flags flags = AccessToFlag();
+
+                // See: https://www.xilinx.com/support/documentation/sw_manuals/xilinx2018_2_xdf/ug1277-sdaccel-programmers-guide.pdf (Page 20)
+                if(memoryBank != MemoryBank::Unspecified){
+                    extendedPointer = CreateExtendedMemoryPointer(memoryBank);
+                    m_buffer = cl::Buffer(context.context(), flags | CL_MEM_EXT_PTR_XILINX, m_size * sizeof(T), &extendedPointer, &errorCode);
+                }else{
+                    m_buffer = cl::Buffer(context.context(), flags, m_size * sizeof(T), nullptr, &errorCode);
                 }
-
-                m_buffer = cl::Buffer(context.context(), flags, m_size * sizeof(T), nullptr, &errorCode);
 
                 if(errorCode != CL_SUCCESS)
                     throw RuntimeError("Failed to initialize device memory.");
@@ -132,7 +134,7 @@ namespace OpenCL{
 
             template<typename IteratorType, typename = typename
                      std::enable_if<IsIteratorOfType<IteratorType, T>() && IsRandomAccess<IteratorType>()>::type>
-            void CopyToHost(IteratorType target){
+            void CopyToHost(IteratorType target) {
                 // Data can be transferred back to the host using the read buffer operation
                 cl_int errorCode = m_context->commandQueue().enqueueReadBuffer(m_buffer, CL_TRUE, 0, m_size * sizeof(T), &(*target));
 
@@ -147,8 +149,47 @@ namespace OpenCL{
 
         private:
             Context *m_context;
+            MemoryBank m_memoryBank;
             size_t m_size;
             cl::Buffer m_buffer;
+            cl_mem_ext_ptr_t extendedPointer;
+
+            static inline cl_mem_flags AccessToFlag() {
+                switch (access) {
+                    case Access::ReadOnly:
+                        return CL_MEM_READ_ONLY;
+                    case Access::WriteOnly:
+                        return CL_MEM_WRITE_ONLY;
+                    case Access::ReadWrite:
+                        return CL_MEM_READ_WRITE;
+                }
+                throw std::invalid_argument("Access has to be one of {Access::ReadOnly, Access::WriteOnly, Access::ReadWrite}!");
+            }
+
+            static inline cl_mem_flags MemoryBankToFlag(MemoryBank memoryBank){
+                switch(memoryBank) {
+                    case MemoryBank::MemoryBank0:
+                        return XCL_MEM_DDR_BANK0;
+                    case MemoryBank::MemoryBank1:
+                        return XCL_MEM_DDR_BANK1;
+                    case MemoryBank::MemoryBank2:
+                        return XCL_MEM_DDR_BANK2;
+                    case MemoryBank::MemoryBank3:
+                        return XCL_MEM_DDR_BANK3;
+                    case MemoryBank::Unspecified:
+                        throw std::invalid_argument("MemoryBank has to be one of {MemoryBank::MemoryBank0, MemoryBank::MemoryBank1, MemoryBank::MemoryBank2, MemoryBank::MemoryBank3}!");
+                }
+                throw std::invalid_argument("MemoryBank has to be one of {MemoryBank::MemoryBank0, MemoryBank::MemoryBank1, MemoryBank::MemoryBank2, MemoryBank::MemoryBank3}!");
+            }
+
+            static inline cl_mem_ext_ptr_t CreateExtendedMemoryPointer(MemoryBank memoryBank){
+                // See: https://www.xilinx.com/support/documentation/sw_manuals/xilinx2018_2_xdf/ug1277-sdaccel-programmers-guide.pdf (Page 20)
+                cl_mem_ext_ptr_t extendedPointer;
+                extendedPointer.flags = MemoryBankToFlag(memoryBank);
+                extendedPointer.obj = NULL;
+                extendedPointer.param = 0;
+                return extendedPointer;
+            }
     };
 
     class Program{
@@ -240,7 +281,12 @@ namespace OpenCL{
 
     template<typename T, Access access>
     Buffer<T, access> Context::MakeBuffer(size_t size){
-        return Buffer<T, access>{*this, size};
+        return Buffer<T, access>{*this, MemoryBank::Unspecified, size};
+    }
+
+    template<typename T, Access access>
+    Buffer<T, access> Context::MakeBuffer(MemoryBank memoryBank, size_t size){
+        return Buffer<T, access>{*this, memoryBank, size};
     }
 
     Program Context::MakeProgram(const std::string &xclbin){
