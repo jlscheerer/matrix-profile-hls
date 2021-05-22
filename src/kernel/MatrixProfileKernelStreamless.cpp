@@ -148,11 +148,13 @@ void UpdateAggregates(size_t row, data_t (&P)[rs_len], data_t (&rowAggregate)[rs
 }
 
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
+    #pragma HLS inline
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
 void ReductionComputionElement(data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
                                data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len], data_t *MP, index_t *MPI) {
+    #pragma HLS inline
     // Just always take the max
     ReductionCompute:
     for (size_t i = 0; i < n - m + 1; ++i) {
