@@ -12,6 +12,7 @@
 void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data_t (&df)[rs_len], data_t (&dg)[rs_len], data_t (&inv)[rs_len], 
                                      data_t (&QT)[rs_len], data_t (&P)[rs_len], data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
                                      data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len]) {
+    #pragma HLS inline
     // use T_m as shift register containing the previous m T elements
     // need to be able to access these elements with no contention
     data_t T_m[m];
@@ -69,12 +70,16 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
-        #if 0
-        // set and update mean
+        // recompute mean to achieve II=1
+        mean = 0;
+        PrecomputationComputeUpdateMean:
+        for(size_t k = 1; k < m; ++k) {
+            #pragma HLS UNROLL
+            mean += T_m[k];
+        }
         prev_mean = mean;
-        mean = mean + (T_i - T_r) / m;
-        mu[i - m + 1] = mean;
-        #endif
+        prev_mean += T_r; prev_mean /= m;
+        mean += T_i; mean /= m;
 
         // calculate df: (T[i+m-1] - T[i-1]) / 2
         df[i - m + 1] = (T_i - T_r) / 2;
@@ -106,6 +111,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
         columnAggregate[i - m + 1] = aggregate_init;
         columnAggregateIndex[i - m + 1] = index_init;
 
+        // shift all values in T_m back
         PrecomputationComputeShift: 
         for (size_t k = 0; k < m - 1; ++k){
             #pragma HLS unroll

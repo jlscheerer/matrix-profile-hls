@@ -104,7 +104,7 @@ void MemoryToStream(const data_t *T, stream<data_t, 5> &QT, stream<data_t, 5> &d
         columnWiseAggregate.write(aggregate_init);
         columnWiseIndex.write(index_init);
 
-        // shift all values in T to the left
+        // shift all values in T_m back
         for (int k = 0; k < m - 1; ++k)
             T_m[k] = T_m[k + 1];
         T_m[m - 1] = T_i;
