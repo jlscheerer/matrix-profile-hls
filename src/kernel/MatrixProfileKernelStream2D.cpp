@@ -3,7 +3,7 @@
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
  * @brief   Implementation of the Kernel (C++/Vitis HLS) [Stream-2D]
  */
-
+// TODO: Maybe move ProcessingElements into individual files
 #include "MatrixProfile.hpp"
 #include "kernel/MatrixProfileKernel.hpp"
 
@@ -90,7 +90,6 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
     }
 }
 
-// TODO: Take Arrays as references
 void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], data_t (&Tj_m)[t + m - 1],
         data_t mui_m, data_t (&muj_m)[t], data_t (&dfi_m)[t], data_t (&dfj_m)[2 * t - 1], data_t (&dgi_m)[t], data_t (&dgj_m)[2 * t - 1],
         data_t (&invi_m)[t], data_t (&invj_m)[2 * t - 1], data_t (&QT)[t], data_t (&rowAggregate)[t], index_t (&rowAggregateIndex)[t],
@@ -179,23 +178,16 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
         stream<data_t, stream_d> &sT_out, stream<data_t, stream_d> &sMu_out, stream<data_t, stream_d> &sDf_out, stream<data_t, stream_d> &sDg_out,
         stream<data_t, stream_d> &sInv_out) {
     // local "cache" for time series values for the current row/column
-    data_t Ti_m[m];
-    data_t Tj_m[t + m - 1];
+    data_t Ti_m[m], Tj_m[t + m - 1];
 
     // local "cache" for means for the current row/column
-    data_t mui_m = 0;
-    data_t muj_m[t];
+    data_t mui_m = 0, muj_m[t];
 
     // local "cache" for df/dg for the current row/column
-    data_t dfi_m[t];
-    data_t dfj_m[2 * t - 1];
-
-    data_t dgi_m[t];
-    data_t dgj_m[2 * t - 1];
+    data_t dfi_m[t], dfj_m[2 * t - 1], dgi_m[t], dgj_m[2 * t - 1];
 
     // local "cache" for inverses for the current row/column
-    data_t invi_m[t];
-    data_t invj_m[2 * t - 1];
+    data_t invi_m[t], invj_m[2 * t - 1];
 
     // =============== [Scatter] ===============
     data_t mu = 0, df = 0, dg = 0, inv = 0;
@@ -319,23 +311,16 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
         stream<data_t, stream_d> &rowAggregate_out, stream<index_t, stream_d> &rowAggregateIndex_out, stream<data_t, stream_d> &columnAggregate_out,
         stream<index_t, stream_d> &columnAggregateIndex_out) {
     // local "cache" for time series values for the current row/column
-    data_t Ti_m[m];
-    data_t Tj_m[t + m - 1];
+    data_t Ti_m[m], Tj_m[t + m - 1];
 
     // local "cache" for means for the current row/column
-    data_t mui_m = 0;
-    data_t muj_m[t];
+    data_t mui_m = 0, muj_m[t];
 
     // local "cache" for df/dg for the current row/column
-    data_t dfi_m[t];
-    data_t dfj_m[2 * t - 1];
-
-    data_t dgi_m[t];
-    data_t dgj_m[2 * t - 1];
+    data_t dfi_m[t], dfj_m[2 * t - 1], dgi_m[t], dgj_m[2 * t - 1];
 
     // local "cache" for inverses for the current row/column
-    data_t invi_m[t];
-    data_t invj_m[2 * t - 1];
+    data_t invi_m[t], invj_m[2 * t - 1];
 
     // =============== [Scatter] ===============
     // RowStreaming: Read Values for the current row
@@ -482,7 +467,6 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     // =============== [/Reduce] ===============
 }
 
-// TODO: Maybe just take in the i streams (or even move inside row streams?)
 void RowReductionUnit(size_t yStage, stream<data_t, stream_d> &rRow_in, stream<index_t, stream_d> &rRowIndex_in,
         stream<data_t, stream_d> &rCol_in, stream<index_t, stream_d> &rColIndex_in,
 
@@ -542,9 +526,8 @@ void StreamToMemory(stream<data_t, stream_d> &rRow_in, stream<index_t, stream_d>
 
     // Just rows
     for (size_t i = 0; i < n - m + 1; ++i) {
-        data_t rowAggregate = rRow_in.read();
-        index_t rowAggregateIndex = rRowIndex_in.read();
-        // TODO: Improve this (move out MP?, calculate MP only once)
+        data_t rowAggregate = rRow_in.read(); index_t rowAggregateIndex = rRowIndex_in.read();
+        // TODO: Improve this (move out MP?, calculate PearsonCorrelation only once)
         data_t euclideanDistance = PearsonCorrelationToEuclideanDistance(rowAggregate);
         if (euclideanDistance < MP[i]) {
             MP[i] = euclideanDistance;
@@ -554,9 +537,8 @@ void StreamToMemory(stream<data_t, stream_d> &rRow_in, stream<index_t, stream_d>
 
     // Just columns
     for (size_t i = 0; i < n - m + 1; ++i) {
-        data_t columnAggregate = rCol_in.read();
-        index_t columnAggregareIndex = rColIndex_in.read();
-        // TODO: Improve this (move out MP?, calculate MP only once)
+        data_t columnAggregate = rCol_in.read(); index_t columnAggregareIndex = rColIndex_in.read();
+        // TODO: Improve this (move out MP?, calculate PearsonCorrelation only once)
         data_t euclideanDistance = PearsonCorrelationToEuclideanDistance(columnAggregate);
         if (euclideanDistance < MP[i]) {
             MP[i] = euclideanDistance;
@@ -567,47 +549,22 @@ void StreamToMemory(stream<data_t, stream_d> &rRow_in, stream<index_t, stream_d>
 
 void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     constexpr size_t nTiles = ceilDiv(n - m + 1, t);
-
-    // total Number of Tiles ((nTiles + 1) * nTiles) / 2
-    // sum_{1...nTiles} i [number of internal/row-wise streams]
     constexpr size_t nStreams = ((nTiles + 1) * nTiles) / 2;
 
     // Streams for the Scatter Lane
-    stream<data_t, stream_d> sT[nTiles + 1];
-    stream<data_t, stream_d> sMu[nTiles + 1];
-    stream<data_t, stream_d> sDf[nTiles + 1];
-    stream<data_t, stream_d> sDg[nTiles + 1];
-    stream<data_t, stream_d> sInv[nTiles + 1];
+    stream<data_t, stream_d> sT[nTiles + 1], sMu[nTiles + 1], sDf[nTiles + 1], sDg[nTiles + 1], sInv[nTiles + 1];
 
-    // Stream for rows (i.e. not scatter lane)
-    stream<data_t, stream_d> Ti[nStreams];
-    stream<data_t, stream_d> Tj[nStreams];
+    // Streams for rows (i.e. not scatter lane)
+    stream<data_t, stream_d> Ti[nStreams], Tj[nStreams], mui[nStreams], muj[nStreams];
+    stream<data_t, stream_d> dfi[nStreams], dfj[nStreams], dgi[nStreams], dgj[nStreams], invi[nStreams], invj[nStreams];
 
-    stream<data_t, stream_d> mui[nStreams];
-    stream<data_t, stream_d> muj[nStreams];
-
-    stream<data_t, stream_d> dfi[nStreams];
-    stream<data_t, stream_d> dfj[nStreams];
-
-    stream<data_t, stream_d> dgi[nStreams];
-    stream<data_t, stream_d> dgj[nStreams];
-
-    stream<data_t, stream_d> invi[nStreams];
-    stream<data_t, stream_d> invj[nStreams];
-
-    // Stream for rows (aggregates)
-    stream<data_t, stream_d> rowAggregate[nStreams];
-    stream<index_t, stream_d> rowAggregateIndex[nStreams];
-
-    stream<data_t, stream_d> columnAggregate[nStreams];
-    stream<index_t, stream_d> columnAggregateIndex[nStreams];
+    // Streams for rows (aggregates)
+    stream<data_t, stream_d> rowAggregate[nStreams]; stream<index_t, stream_d> rowAggregateIndex[nStreams];
+    stream<data_t, stream_d> columnAggregate[nStreams]; stream<index_t, stream_d> columnAggregateIndex[nStreams];
 
     // Streams for the Reduction Lane
-    stream<data_t, stream_d> rRow[nTiles + 1];
-    stream<index_t, stream_d> rRowIndex[nTiles + 1];
-
-    stream<data_t, stream_d> rCol[nTiles + 1];
-    stream<index_t, stream_d> rColIndex[nTiles + 1];
+    stream<data_t, stream_d> rRow[nTiles + 1]; stream<index_t, stream_d> rRowIndex[nTiles + 1];
+    stream<data_t, stream_d> rCol[nTiles + 1]; stream<index_t, stream_d> rColIndex[nTiles + 1];
 
     MemoryToStream(T, sT[0], sMu[0], sDf[0], sDg[0], sInv[0]);
 
