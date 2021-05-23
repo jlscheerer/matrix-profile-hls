@@ -12,7 +12,7 @@
 void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data_t (&df)[rs_len], data_t (&dg)[rs_len], data_t (&inv)[rs_len], 
                                      data_t (&QT)[rs_len], data_t (&P)[rs_len], data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
                                      data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len]) {
-    #pragma HLS inline
+    #pragma HLS INLINE
     // use T_m as shift register containing the previous m T elements
     // need to be able to access these elements with no contention
     data_t T_m[m];
@@ -24,7 +24,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
 
     PrecomputationInitT:
     for (size_t i = 0; i < m; ++i) {
-        #pragma HLS pipeline II=1
+        #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
         T_m[i] = T_i;
         Ti_m[i] = T_i;
@@ -33,7 +33,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     data_t mean = 0;
     PrecomputationInitMu:
     for(size_t i = 0; i < m; ++i){
-        #pragma HLS unroll
+        #pragma HLS UNROLL
         mean += T_m[i];
     }
     mean /= m;
@@ -48,7 +48,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     data_t qt_sum = 0;
     PrecomputationInitInvQT:
     for (size_t k = 0; k < m; ++k) {
-        #pragma HLS unroll
+        #pragma HLS UNROLL
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
     }
@@ -58,15 +58,13 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     QT[0] = qt_sum;
     P[0] = 1;
 
-    rowAggregate[0] = aggregate_init;
-    rowAggregateIndex[0] = index_init;
-    columnAggregate[0] = aggregate_init;
-    columnAggregateIndex[0] = index_init;
+    rowAggregate[0] = aggregate_init; rowAggregateIndex[0] = index_init;
+    columnAggregate[0] = aggregate_init; columnAggregateIndex[0] = index_init;
 
     data_t prev_mean;
     PrecomputationCompute:
     for (size_t i = m; i < n; ++i) {
-        #pragma HLS pipeline II=1
+        #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
@@ -91,7 +89,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
 
         PrecomputationComputeUpdateInvQT:
         for (size_t k = 1; k < m; k++) {
-            #pragma HLS unroll
+            #pragma HLS UNROLL
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
         }
@@ -106,15 +104,13 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
         // calculate Pearson Correlation: P_{i, j} = QT_{i, j} * inv_i * inv_j
         P[i - m + 1] = qt_sum * inv0 * 1 / sqrt(inv_sum);
 
-        rowAggregate[i - m + 1] = aggregate_init;
-        rowAggregateIndex[i - m + 1] = index_init;
-        columnAggregate[i - m + 1] = aggregate_init;
-        columnAggregateIndex[i - m + 1] = index_init;
+        rowAggregate[i - m + 1] = aggregate_init; rowAggregateIndex[i - m + 1] = index_init;
+        columnAggregate[i - m + 1] = aggregate_init; columnAggregateIndex[i - m + 1] = index_init;
 
         // shift all values in T_m back
         PrecomputationComputeShift: 
         for (size_t k = 0; k < m - 1; ++k){
-            #pragma HLS unroll
+            #pragma HLS UNROLL
             T_m[k] = T_m[k + 1];
         }
         T_m[m - 1] = T_i;
@@ -124,8 +120,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
 void UpdateAggregates(size_t row, data_t (&P)[rs_len], data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
                       data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len]) {
     // P each iteration (row) P contains one less valid value (upper-triangular matrix)
-    data_t rowMax = aggregate_init;
-    index_t rowMaxIndex = index_init;
+    data_t rowMax = aggregate_init; index_t rowMaxIndex = index_init;
 
     UpdateAggregateCompute:
     for (size_t column = row; column < n - m + 1; ++column) {
@@ -148,13 +143,13 @@ void UpdateAggregates(size_t row, data_t (&P)[rs_len], data_t (&rowAggregate)[rs
 }
 
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
-    #pragma HLS inline
+    #pragma HLS INLINE
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
 void ReductionComputionElement(data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
                                data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len], data_t *MP, index_t *MPI) {
-    #pragma HLS inline
+    #pragma HLS INLINE
     // Just always take the max
     ReductionCompute:
     for (size_t i = 0; i < n - m + 1; ++i) {
@@ -174,6 +169,13 @@ void ReductionComputionElement(data_t (&rowAggregate)[rs_len], index_t (&rowAggr
 }
 
 void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
+    #pragma HLS INTERFACE m_axi     port=T   offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi     port=MP  offset=slave bundle=gmem1
+    #pragma HLS INTERFACE m_axi     port=MPI offset=slave bundle=gmem2
+    #pragma HLS INTERFACE s_axilite port=T   bundle=control
+    #pragma HLS INTERFACE s_axilite port=MP  bundle=control
+    #pragma HLS INTERFACE s_axilite port=MPI bundle=control
+
     data_t mu[rs_len], df[rs_len], dg[rs_len], inv[rs_len];
     data_t QT[rs_len], P[rs_len];
 

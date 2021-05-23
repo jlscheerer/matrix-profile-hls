@@ -89,26 +89,16 @@ namespace OpenCL{
             cl::Context m_context;
             cl::CommandQueue m_queue;
             cl::Device m_device;
+
             static cl::Device FindDevice();
     };
 
     template<typename T, Access access>
     class Buffer{
         public:
-            Buffer(Context &context, size_t size): m_context(&context), m_size(size){
-                cl_int errorCode; cl_mem_flags flags;
 
-                switch (access) {
-                    case Access::ReadOnly:
-                        flags = CL_MEM_READ_ONLY;
-                        break;
-                    case Access::WriteOnly:
-                        flags = CL_MEM_WRITE_ONLY;
-                        break;
-                    case Access::ReadWrite:
-                        flags = CL_MEM_READ_WRITE;
-                        break;
-                }
+            Buffer(Context &context, size_t size) : m_context(&context), m_size(size) {
+                cl_int errorCode; cl_mem_flags flags = AccessToFlag();
 
                 m_buffer = cl::Buffer(context.context(), flags, m_size * sizeof(T), nullptr, &errorCode);
 
@@ -132,7 +122,7 @@ namespace OpenCL{
 
             template<typename IteratorType, typename = typename
                      std::enable_if<IsIteratorOfType<IteratorType, T>() && IsRandomAccess<IteratorType>()>::type>
-            void CopyToHost(IteratorType target){
+            void CopyToHost(IteratorType target) {
                 // Data can be transferred back to the host using the read buffer operation
                 cl_int errorCode = m_context->commandQueue().enqueueReadBuffer(m_buffer, CL_TRUE, 0, m_size * sizeof(T), &(*target));
 
@@ -149,6 +139,18 @@ namespace OpenCL{
             Context *m_context;
             size_t m_size;
             cl::Buffer m_buffer;
+
+            static inline cl_mem_flags AccessToFlag() {
+                switch (access) {
+                    case Access::ReadOnly:
+                        return CL_MEM_READ_ONLY;
+                    case Access::WriteOnly:
+                        return CL_MEM_WRITE_ONLY;
+                    case Access::ReadWrite:
+                        return CL_MEM_READ_WRITE;
+                }
+                throw std::invalid_argument("Access has to be one of {Access::ReadOnly, Access::WriteOnly, Access::ReadWrite}!");
+            }
     };
 
     class Program{
