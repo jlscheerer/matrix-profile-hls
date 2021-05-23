@@ -9,9 +9,9 @@
 
 #include "hls_math.h"
 
-void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data_t (&df)[rs_len], data_t (&dg)[rs_len], data_t (&inv)[rs_len], 
-                                     data_t (&QT)[rs_len], data_t (&P)[rs_len], data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
-                                     data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len]) {
+void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data_t (&df)[sublen], data_t (&dg)[sublen], data_t (&inv)[sublen], 
+                                     data_t (&QT)[sublen], data_t (&P)[sublen], data_t (&rowAggregate)[sublen], index_t (&rowAggregateIndex)[sublen],
+                                     data_t (&columnAggregate)[sublen], index_t (&columnAggregateIndex)[sublen]) {
     #pragma HLS INLINE
     // use T_m as shift register containing the previous m T elements
     // need to be able to access these elements with no contention
@@ -117,13 +117,13 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     }
 }
 
-void UpdateAggregates(size_t row, data_t (&P)[rs_len], data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
-                      data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len]) {
+void UpdateAggregates(size_t row, data_t (&P)[sublen], data_t (&rowAggregate)[sublen], index_t (&rowAggregateIndex)[sublen],
+                      data_t (&columnAggregate)[sublen], index_t (&columnAggregateIndex)[sublen]) {
     // P each iteration (row) P contains one less valid value (upper-triangular matrix)
     data_t rowMax = aggregate_init; index_t rowMaxIndex = index_init;
 
     UpdateAggregateCompute:
-    for (size_t column = row; column < n - m + 1; ++column) {
+    for (size_t column = row; column < sublen; ++column) {
         // check if we are in the exclusion Zone
         // exlusionZone <==> row - m/4 <= column <= row + m/4
         // 				<==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
@@ -147,16 +147,14 @@ data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
-void ReductionComputionElement(data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
-                               data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len], data_t *MP, index_t *MPI) {
+void ReductionComputionElement(data_t (&rowAggregate)[sublen], index_t (&rowAggregateIndex)[sublen],
+                               data_t (&columnAggregate)[sublen], index_t (&columnAggregateIndex)[sublen], data_t *MP, index_t *MPI) {
     #pragma HLS INLINE
     // Just always take the max
     ReductionCompute:
-    for (size_t i = 0; i < n - m + 1; ++i) {
-        data_t rowValue = rowAggregate[i];
-        index_t rowIndex = rowAggregateIndex[i];
-        data_t colValue = columnAggregate[i];
-        index_t colIndex = columnAggregateIndex[i];
+    for (size_t i = 0; i < sublen; ++i) {
+        data_t rowValue = rowAggregate[i]; index_t rowIndex = rowAggregateIndex[i];
+        data_t colValue = columnAggregate[i]; index_t colIndex = columnAggregateIndex[i];
         // Take the max and compute EuclideanDistance
         if (rowValue > colValue) {
             MP[i] = PearsonCorrelationToEuclideanDistance(rowValue);
@@ -176,31 +174,29 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     #pragma HLS INTERFACE s_axilite port=MP  bundle=control
     #pragma HLS INTERFACE s_axilite port=MPI bundle=control
 
-    data_t mu[rs_len], df[rs_len], dg[rs_len], inv[rs_len];
-    data_t QT[rs_len], P[rs_len];
+    data_t mu[sublen], df[sublen], dg[sublen], inv[sublen];
+    data_t QT[sublen], P[sublen];
 
-    data_t rowAggregate[n - m + 1], columnAggregate[n - m + 1];
-    index_t rowAggregateIndex[n - m + 1], columnAggregateIndex[n - m + 1];
+    data_t rowAggregate[sublen]; index_t rowAggregateIndex[sublen];
+    data_t columnAggregate[sublen]; index_t columnAggregateIndex[sublen];
 
     PrecomputationProcessingElement(T, mu, df, dg, inv, QT, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
 
     // TODO: Could move this inside the Precomputation
-    // Update/Initialize Aggregates for the first row
+    // update/initialize Aggregates for the first row
     UpdateAggregates(0, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
 
     // Do the actual calculations via updates
     MatrixProfileComputeRow:
-    for (size_t row = 1; row < n - m + 1; ++row) {
-        
+    for (size_t row = 1; row < sublen; ++row) {
         data_t dfi = df[row]; data_t dgi = dg[row]; data_t invi = inv[row];
         
         MatrixProfileComputeColumn:
-        for (size_t k = 0; k < n - m + 1 - row; ++k) {
-            // column = k + row
+        for (size_t k = 0; k < sublen - row; ++k) {
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
             QT[k] = QT[k] + dfi * dg[k + row] + df[k + row] * dgi;
-            // Directly already calculate the pearson correlation
+            // calculate pearson correlation
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
             P[k] = QT[k] * invi * inv[k + row];
         }

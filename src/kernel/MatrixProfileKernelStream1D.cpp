@@ -267,7 +267,7 @@ void ComputeMatrixProfile(const size_t stage,
 void StreamToMemory(stream<data_t, 5> &rowWiseAggregate, stream<data_t, 5> &columnWiseAggregate,
                     stream<index_t, 5> &rowWiseIndex, stream<index_t, 5> &columnWiseIndex,
 			        data_t *MP, index_t *MPI) {
-    for (int i = 0; i < rs_len; ++i) {
+    for (int i = 0; i < sublen; ++i) {
         data_t rowAggregate = rowWiseAggregate.read();
         index_t row = rowWiseIndex.read();
 
@@ -287,7 +287,7 @@ void StreamToMemory(stream<data_t, 5> &rowWiseAggregate, stream<data_t, 5> &colu
 
 void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     #pragma HLS DATAFLOW
-    const size_t numStages = rs_len;
+    const size_t numStages = sublen;
 
     // Streams required to calculate Correlations
     stream<data_t, 5> QT[numStages + 1];
@@ -311,7 +311,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     MemoryToStream(T, QT[0], df_i[0], df_j[0], dg_i[0], dg_j[0], inv_i[0], inv_j[0],
                    rowWiseAggregate[0], columnWiseAggregate[0], rowWiseIndex[0], columnWiseIndex[0]);
 
-    for (int k = 0; k < rs_len; ++k){
+    for (int k = 0; k < sublen; ++k){
         #pragma HLS UNROLL
         ComputeMatrixProfile(k, QT[k], df_i[k], dg_i[k], df_j[k], dg_j[k], inv_i[k], inv_j[k],
                              rowWiseAggregate[k], columnWiseAggregate[k], rowWiseIndex[k], columnWiseIndex[k],

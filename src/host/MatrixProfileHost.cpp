@@ -38,8 +38,8 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     // TODO: Use alligned Allocator for Host-Side Memory
     // Allocate Host-Side Memory
     std::array<data_t, n> host_T;
-    std::array<data_t, rs_len> host_MP;
-    std::array<index_t, rs_len> host_MPI;
+    std::array<data_t, sublen> host_MP;
+    std::array<index_t, sublen> host_MPI;
 
     // cwd: /media/sd-mmcblk0p1
     // Load Input File Containing Time Series Data into Host Memory
@@ -57,10 +57,10 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
         context.MakeBuffer<data_t, Access::ReadOnly>(n)
     };
     OpenCL::Buffer<data_t, Access::WriteOnly> buffer_MP{
-        context.MakeBuffer<data_t, Access::WriteOnly>(rs_len)
+        context.MakeBuffer<data_t, Access::WriteOnly>(sublen)
     };
     OpenCL::Buffer<index_t, Access::WriteOnly> buffer_MPI{
-        context.MakeBuffer<index_t, Access::WriteOnly>(rs_len)
+        context.MakeBuffer<index_t, Access::WriteOnly>(sublen)
     };
 
     Log<LogLevel::Verbose>("Programming device...");
@@ -97,12 +97,12 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     }else{
         // Just output the result to the console (for debugging)
         std::cout << "MP:";
-        for(size_t i = 0; i < rs_len; ++i)
+        for(size_t i = 0; i < sublen; ++i)
     	    std::cout << " " << host_MP[i];
         std::cout << std::endl;
 
         std::cout << "MPI:";
-        for(size_t i = 0; i < rs_len; ++i)
+        for(size_t i = 0; i < sublen; ++i)
             std::cout << " " << host_MPI[i];
         std::cout << std::endl;
     }

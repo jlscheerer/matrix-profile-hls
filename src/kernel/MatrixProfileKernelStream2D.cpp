@@ -12,7 +12,7 @@
 
 void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     // TODO: Actually Implement Stream-2D Kernel
-    for(int i = 0; i < rs_len; ++i){
+    for(int i = 0; i < sublen; ++i){
         MP[i] = aggregate_init;
         MPI[i] = index_init;
     }
