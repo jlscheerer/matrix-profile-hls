@@ -5,6 +5,7 @@
  */
 
 #pragma once
+
 #include <cstdlib>
 
 #define KERNEL_STREAMLESS 1

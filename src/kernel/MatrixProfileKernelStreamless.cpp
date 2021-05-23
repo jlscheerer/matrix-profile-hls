@@ -58,10 +58,8 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
     QT[0] = qt_sum;
     P[0] = 1;
 
-    rowAggregate[0] = aggregate_init;
-    rowAggregateIndex[0] = index_init;
-    columnAggregate[0] = aggregate_init;
-    columnAggregateIndex[0] = index_init;
+    rowAggregate[0] = aggregate_init; rowAggregateIndex[0] = index_init;
+    columnAggregate[0] = aggregate_init; columnAggregateIndex[0] = index_init;
 
     data_t prev_mean;
     PrecomputationCompute:
@@ -106,10 +104,8 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
         // calculate Pearson Correlation: P_{i, j} = QT_{i, j} * inv_i * inv_j
         P[i - m + 1] = qt_sum * inv0 * 1 / sqrt(inv_sum);
 
-        rowAggregate[i - m + 1] = aggregate_init;
-        rowAggregateIndex[i - m + 1] = index_init;
-        columnAggregate[i - m + 1] = aggregate_init;
-        columnAggregateIndex[i - m + 1] = index_init;
+        rowAggregate[i - m + 1] = aggregate_init; rowAggregateIndex[i - m + 1] = index_init;
+        columnAggregate[i - m + 1] = aggregate_init; columnAggregateIndex[i - m + 1] = index_init;
 
         // shift all values in T_m back
         PrecomputationComputeShift: 
@@ -124,8 +120,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[rs_len], data
 void UpdateAggregates(size_t row, data_t (&P)[rs_len], data_t (&rowAggregate)[rs_len], index_t (&rowAggregateIndex)[rs_len],
                       data_t (&columnAggregate)[rs_len], index_t (&columnAggregateIndex)[rs_len]) {
     // P each iteration (row) P contains one less valid value (upper-triangular matrix)
-    data_t rowMax = aggregate_init;
-    index_t rowMaxIndex = index_init;
+    data_t rowMax = aggregate_init; index_t rowMaxIndex = index_init;
 
     UpdateAggregateCompute:
     for (size_t column = row; column < n - m + 1; ++column) {
