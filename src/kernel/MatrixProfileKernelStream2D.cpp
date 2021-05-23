@@ -421,9 +421,6 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     // =============== [/Compute] ===============
 
     // =============== [Reduce] ===============
-    // TODO: Merge these loops again
-    // TODO: Adjust for bounds
-
     // Just rows
     for (size_t i = 0; i < t; ++i) {
         data_t rowAgr = rowAggregate_in.read();
