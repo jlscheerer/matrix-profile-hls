@@ -39,13 +39,9 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
     mean /= m;
 
     // calculate initial values
-    data_t mu0 = mean;
-    mu[0] = mu0;
-    df[0] = 0;
-    dg[0] = 0;
+    data_t mu0 = mean; mu[0] = mu0; df[0] = 0; dg[0] = 0;
 
-    data_t inv_sum = 0;
-    data_t qt_sum = 0;
+    data_t inv_sum = 0, qt_sum = 0;
     PrecomputationInitInvQT:
     for (size_t k = 0; k < m; ++k) {
         #pragma HLS UNROLL
@@ -54,9 +50,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
     }
 
     data_t inv0 = 1 / sqrt(inv_sum);
-    inv[0] = inv0;
-    QT[0] = qt_sum;
-    P[0] = 1;
+    inv[0] = inv0; QT[0] = qt_sum; P[0] = 1;
 
     rowAggregate[0] = aggregate_init; rowAggregateIndex[0] = index_init;
     columnAggregate[0] = aggregate_init; columnAggregateIndex[0] = index_init;
@@ -121,9 +115,9 @@ void UpdateAggregates(size_t row, data_t (&P)[sublen], data_t (&rowAggregate)[su
                       data_t (&columnAggregate)[sublen], index_t (&columnAggregateIndex)[sublen]) {
     // P each iteration (row) P contains one less valid value (upper-triangular matrix)
     data_t rowMax = aggregate_init; index_t rowMaxIndex = index_init;
-
     UpdateAggregateCompute:
     for (size_t column = row; column < sublen; ++column) {
+        #pragma HLS PIPELINE II=1
         // check if we are in the exclusion Zone
         // exlusionZone <==> row - m/4 <= column <= row + m/4
         // 				<==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
@@ -153,6 +147,7 @@ void ReductionComputionElement(data_t (&rowAggregate)[sublen], index_t (&rowAggr
     // Just always take the max
     ReductionCompute:
     for (size_t i = 0; i < sublen; ++i) {
+        #pragma HLS PIPELINE II=1
         data_t rowValue = rowAggregate[i]; index_t rowIndex = rowAggregateIndex[i];
         data_t colValue = columnAggregate[i]; index_t colIndex = columnAggregateIndex[i];
         // Take the max and compute EuclideanDistance
@@ -178,11 +173,14 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     data_t QT[sublen], P[sublen];
 
     data_t rowAggregate[sublen]; index_t rowAggregateIndex[sublen];
+
     data_t columnAggregate[sublen]; index_t columnAggregateIndex[sublen];
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate complete
+    #pragma HLS ARRAY_PARTITION variable=columnAggregateIndex complete
 
     PrecomputationProcessingElement(T, mu, df, dg, inv, QT, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
 
-    // TODO: Could move this inside the Precomputation
+    // TODO: Could move this inside the Precomputation (Optimize because only init)
     // update/initialize Aggregates for the first row
     UpdateAggregates(0, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
 
@@ -190,20 +188,36 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     MatrixProfileComputeRow:
     for (size_t row = 1; row < sublen; ++row) {
         data_t dfi = df[row]; data_t dgi = dg[row]; data_t invi = inv[row];
-        
+        data_t rowMax = aggregate_init; index_t rowMaxIndex = index_init;
+
         MatrixProfileComputeColumn:
         for (size_t k = 0; k < sublen - row; ++k) {
+            #pragma HLS PIPELINE II=1
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
             QT[k] = QT[k] + dfi * dg[k + row] + df[k + row] * dgi;
             // calculate pearson correlation
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
             P[k] = QT[k] * invi * inv[k + row];
-        }
 
-        // Update Aggregates for the current row
-        // TODO: Instead of this inline function directly into upper body
-        UpdateAggregates(row, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
+            // Update Aggregates
+            // TODO: Update LOOP bounds to reflect this
+            // exlusionZone <==> row - m/4 <= column <= row + m/4
+            // 				<==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
+            //              <==> row + k <= row + m/4
+            //              <==> k <= m/4
+            constexpr size_t column = row + k;
+            bool exclusionZone = k <= m / 4;
+            if(!exclusionZone && P[k] > columnAggregate[column]){
+                columnAggregate[column] = P[k];
+                columnAggregateIndex[column] = row;
+            }
+            if(!exclusionZone && P[k] > rowMax){
+                rowMax = P[k];
+                rowMaxIndex = column;
+            }
+        }
+        rowAggregate[row] = rowMax; rowAggregateIndex[row] = rowMaxIndex;
     }
     
     ReductionComputionElement(rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex, MP, MPI);
