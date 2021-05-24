@@ -158,7 +158,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
     // factor=3 required for fadd and fmul (update if data_t changes)
     data_t columnAggregate[sublen]; index_t columnAggregateIndex[sublen];
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=3
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate      cyclic factor=3
     #pragma HLS ARRAY_PARTITION variable=columnAggregateIndex cyclic factor=3
 
     PrecomputationProcessingElement(T, mu, df, dg, inv, QT, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
@@ -171,7 +171,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
         // exclusionZone integrated into loop bounds
         // exclusionZone <==> row - m/4 <= column <= row + m/4
-        // 				 <==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
+        // 			     <==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
         //               <==> row + k <= row + m/4
         //               <==> k <= m/4
         MatrixProfileComputeColumn:
