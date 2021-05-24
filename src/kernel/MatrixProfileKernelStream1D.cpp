@@ -33,9 +33,6 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
         Ti_m[i] = T_i;
     }
     mean /= m;
-
-    // Prepare for the first values (QT, inv, Aggregates)
-    // Calculate initial values
     data_t mu0 = mean;
 
     // TODO: Unroll this Loop
@@ -158,7 +155,6 @@ void MatrixProfileComputationElement(size_t stage, stream<data_t, stream_d> &QT_
     data_t pdf_i = df_i, pdg_i = dg_i, pinv_i = inv_i;
     data_t pP = P; bool pExclusionZone = exclusionZone;
     data_t pRowAggregate = rowAggregate; index_t pRowAggregateIndex = rowAggregateIndex;
-    // n - m + 1 - stage - 1 because first element was taken care outside the loop
     for (size_t i = 1; i < n - m + 1 - stage; ++i) {
         data_t pQT = QT_in.read();
 
@@ -267,24 +263,15 @@ void StreamToMemory(stream<data_t, stream_d> &rowAggregate, stream<index_t, stre
 void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     constexpr size_t numStages = n - m + 1;
 
-    // Streams required to calculate Correlations
+    // Streams for the Scatter Lane (i: rows, j: columns)
     stream<data_t, stream_d> QT[numStages + 1];
+    stream<data_t, stream_d> df_i[numStages + 1], df_j[numStages + 1];
+    stream<data_t, stream_d> dg_i[numStages + 1], dg_j[numStages + 1];
+    stream<data_t, stream_d> inv_i[numStages + 1], inv_j[numStages + 1];
 
-    stream<data_t, stream_d> df_i[numStages + 1];
-    stream<data_t, stream_d> df_j[numStages + 1];
-
-    stream<data_t, stream_d> dg_i[numStages + 1];
-    stream<data_t, stream_d> dg_j[numStages + 1];
-
-    stream<data_t, stream_d> inv_i[numStages + 1];
-    stream<data_t, stream_d> inv_j[numStages + 1];
-
-    // Store the intermediate results
-    stream<data_t, stream_d> rowAggregate[numStages + 1];
-    stream<index_t, stream_d> rowAggregateIndex[numStages + 1];
-
-    stream<data_t, stream_d> columnAggregate[numStages + 1];
-    stream<index_t, stream_d> columnAggregateIndex[numStages + 1];
+    // Streams for the Reduction Lane (Aggregates)
+    stream<data_t, stream_d> rowAggregate[numStages + 1], rowAggregateIndex[numStages + 1];
+    stream<data_t, stream_d> columnAggregate[numStages + 1], columnAggregateIndex[numStages + 1];
 
     MemoryToStream(T, QT[0], df_i[0], df_j[0], dg_i[0], dg_j[0], inv_i[0], inv_j[0], rowAggregate[0],
             rowAggregateIndex[0], columnAggregate[0], columnAggregateIndex[0]);
