@@ -58,7 +58,6 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
     // Maximum PearsonCorrelation and corresponding Index for the first row
     data_t rowMax = aggregate_init; index_t rowMaxIndex = index_init;
 
-    data_t prev_mean;
     PrecomputationCompute:
     for (size_t i = m; i < n; ++i) {
         #pragma HLS PIPELINE II=1
@@ -72,7 +71,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
             #pragma HLS UNROLL
             mean += T_m[k];
         }
-        prev_mean = mean;
+        data_t prev_mean = mean;
         prev_mean += T_r; prev_mean /= m;
         mean += T_i; mean /= m;
 
@@ -139,13 +138,8 @@ void ReductionComputionElement(data_t (&rowAggregate)[sublen], index_t (&rowAggr
         data_t rowValue = rowAggregate[i]; index_t rowIndex = rowAggregateIndex[i];
         data_t colValue = columnAggregate[i]; index_t colIndex = columnAggregateIndex[i];
         // Take the max and compute EuclideanDistance
-        if (rowValue > colValue) {
-            MP[i] = PearsonCorrelationToEuclideanDistance(rowValue);
-            MPI[i] = rowIndex;
-        } else {
-            MP[i] = PearsonCorrelationToEuclideanDistance(colValue);
-            MPI[i] = colIndex;
-        }
+        MP[i]  = PearsonCorrelationToEuclideanDistance(rowValue > colValue ? rowValue : colValue);
+        MPI[i] = rowValue > colValue ? rowIndex : colIndex;
     }
 }
 
@@ -175,8 +169,13 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         data_t dfi = df[row]; data_t dgi = dg[row]; data_t invi = inv[row];
         data_t rowMax = aggregate_init; index_t rowMaxIndex = index_init;
 
+        // exclusionZone integrated into loop bounds
+        // exclusionZone <==> row - m/4 <= column <= row + m/4
+        // 				 <==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
+        //               <==> row + k <= row + m/4
+        //               <==> k <= m/4
         MatrixProfileComputeColumn:
-        for (size_t k = 0; k < sublen - row; ++k) {
+        for (size_t k = (m / 4) + 1; k < sublen - row; ++k) {
             #pragma HLS PIPELINE II=1
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
@@ -186,20 +185,12 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
             P[k] = QT[k] * invi * inv[k + row];
 
             // Update Aggregates
-            // TODO: Update LOOP bounds to reflect this
-            // exlusionZone <==> row - m/4 <= column <= row + m/4
-            // 				<==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
-            //              <==> row + k <= row + m/4
-            //              <==> k <= m/4
             const size_t column = row + k;
-            bool exclusionZone = k <= m / 4;
-            if(!exclusionZone && P[k] > columnAggregate[column]){
-                columnAggregate[column] = P[k];
-                columnAggregateIndex[column] = row;
+            if(P[k] > columnAggregate[column]){
+                columnAggregate[column] = P[k]; columnAggregateIndex[column] = row;
             }
-            if(!exclusionZone && P[k] > rowMax){
-                rowMax = P[k];
-                rowMaxIndex = column;
+            if(P[k] > rowMax){
+                rowMax = P[k]; rowMaxIndex = column;
             }
         }
         rowAggregate[row] = rowMax; rowAggregateIndex[row] = rowMaxIndex;
