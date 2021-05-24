@@ -52,8 +52,11 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
     data_t inv0 = 1 / sqrt(inv_sum);
     inv[0] = inv0; QT[0] = qt_sum; P[0] = 1;
 
-    rowAggregate[0] = aggregate_init; rowAggregateIndex[0] = index_init;
+    // Assumption: will always be in the exclusionZone
     columnAggregate[0] = aggregate_init; columnAggregateIndex[0] = index_init;
+
+    // Maximum PearsonCorrelation and corresponding Index for the first row
+    data_t rowMax = aggregate_init; index_t rowMaxIndex = index_init;
 
     data_t prev_mean;
     PrecomputationCompute:
@@ -99,7 +102,15 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
         P[i - m + 1] = qt_sum * inv0 * 1 / sqrt(inv_sum);
 
         rowAggregate[i - m + 1] = aggregate_init; rowAggregateIndex[i - m + 1] = index_init;
-        columnAggregate[i - m + 1] = aggregate_init; columnAggregateIndex[i - m + 1] = index_init;
+        
+        bool exclusionZone = (i - m + 1) <= m / 4;
+        columnAggregate[i - m + 1]      = exclusionZone ? aggregate_init : P[i - m + 1]; 
+        columnAggregateIndex[i - m + 1] = exclusionZone ? index_init     : 0;
+
+        if (!exclusionZone && P[i - m + 1] > rowMax) {
+            rowMax = P[i - m + 1];
+            rowMaxIndex = i - m + 1;
+        }
 
         // shift all values in T_m back
         PrecomputationComputeShift: 
@@ -109,31 +120,8 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
         }
         T_m[m - 1] = T_i;
     }
-}
-
-void UpdateAggregates(size_t row, data_t (&P)[sublen], data_t (&rowAggregate)[sublen], index_t (&rowAggregateIndex)[sublen],
-                      data_t (&columnAggregate)[sublen], index_t (&columnAggregateIndex)[sublen]) {
-    // P each iteration (row) P contains one less valid value (upper-triangular matrix)
-    data_t rowMax = aggregate_init; index_t rowMaxIndex = index_init;
-    UpdateAggregateCompute:
-    for (size_t column = row; column < sublen; ++column) {
-        #pragma HLS PIPELINE II=1
-        // check if we are in the exclusion Zone
-        // exlusionZone <==> row - m/4 <= column <= row + m/4
-        // 				<==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
-        bool exlusionZone = column <= row + m / 4;
-        if (!exlusionZone && P[column - row] > columnAggregate[column]) {
-            columnAggregate[column] = P[column - row];
-            columnAggregateIndex[column] = row;
-        }
-        if (!exlusionZone && P[column - row] > rowMax) {
-            rowMax = P[column - row];
-            rowMaxIndex = column;
-        }
-    }
-
-    rowAggregate[row] = rowMax;
-    rowAggregateIndex[row] = rowMaxIndex;
+    // set the aggregates for the first row
+    rowAggregate[0] = rowMax; rowAggregateIndex[0] = rowMaxIndex;
 }
 
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
@@ -180,10 +168,6 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     #pragma HLS ARRAY_PARTITION variable=columnAggregateIndex cyclic factor=3
 
     PrecomputationProcessingElement(T, mu, df, dg, inv, QT, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
-
-    // TODO: Could move this inside the Precomputation (Optimize because only init)
-    // update/initialize Aggregates for the first row
-    UpdateAggregates(0, P, rowAggregate, rowAggregateIndex, columnAggregate, columnAggregateIndex);
 
     // Do the actual calculations via updates
     MatrixProfileComputeRow:
