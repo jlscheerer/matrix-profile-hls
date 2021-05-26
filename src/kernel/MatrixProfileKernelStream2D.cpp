@@ -20,61 +20,70 @@ constexpr size_t stream_d = 3;
 constexpr size_t ceilDiv(const size_t x, const size_t y) { return (x + y - 1) / y; }
 constexpr size_t min(const size_t a, const size_t b){ return (a < b) ? a : b; }
 
-// TODO: Delay sending T (model this) or have depth of at least m
 void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t, stream_d> &sMu,
                     stream<data_t, stream_d> &sDf, stream<data_t, stream_d> &sDg, stream<data_t, stream_d> &sInv) {
     // store the previous (m-1) T-values in local "cache" (acts as shift-register)
     data_t T_m[m];
-
-    // current value of the running mean calculation
-    data_t mean = 0;
+    #pragma HLS ARRAY_PARITION variable=T_m complete
 
     // initialize mean calculation and local "cache"
     // read T values cannot be directly passed on (this would cause a deadlock in the ProcessingElements)
-    PrecomputationInitTMu:
+    PrecomputationInitT:
     for (size_t i = 0; i < m; ++i) {
-        data_t Ti = T[i];
-        T_m[i] = Ti;
-        mean += Ti;
+        #pragma HLS PIPELINE II=1
+        T_m[i] = T[i];
+    }
+
+    data_t mean = 0;
+    PrecomputationInitMu:
+    for (size_t i = 0; i < m; ++i){
+        #pragma HLS UNROLL
+        mean += T_m[i];
     }
     mean /= m;
-
-    // do the first iteration manually (mean, inv, df, dg)
-    sMu.write(mean); sDf.write(0); sDg.write(0);
 
     data_t inv_sum = 0;
     PrecomputationInitInv:
     for (int k = 0; k < m; ++k){
+        #pragma HLS UNROLL
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
     }
+
+    // do the first iteration manually (mean, inv, df, dg)
+    sMu.write(mean); sDf.write(0); sDg.write(0);
     sInv.write(1 / sqrt(inv_sum));
 
-    data_t prev_mean = 0;
     PrecomputationCompute:
     for (size_t i = m; i < n; ++i) {
+        #pragma HLS PIPELINE II=1
         data_t Ti = T[i];
         data_t Tm = T_m[0];
 
-        prev_mean = mean;
-        mean += (Ti - Tm) / m;
+        // recompute mean to achieve II=1
+        mean = 0;
+        PrecomputationComputeUpdateMean:
+        for(size_t k = 1; k < m; ++k) {
+            #pragma HLS UNROLL
+            mean += T_m[k];
+        }
+        data_t prev_mean = mean;
+        prev_mean += Tm; prev_mean /= m;
+        mean += Ti; mean /= m;
 
-        sT.write(Tm);
-        sMu.write(mean);
+        sT.write(Tm); sMu.write(mean);
 
         // calculate df: (T[i+m-1] - T[i-1]) / 2
-        // df[i - m + 1] = (T_i - T_r) / 2;
         data_t df = (Ti - Tm) / 2;
         sDf.write(df);
 
         // calculate dg: (T[i+m-1] - μ[i]) * (T[i-1] - μ[i-1])
-        // dg[i - m + 1] = (T_i - mean) + (T_r - prev_mean);
         data_t dg = (Ti - mean) + (Tm - prev_mean);
         sDg.write(dg);
 
         inv_sum = 0;
-
         PrecomputationComputeUpdateInv:
         for (size_t k = 1; k < m; ++k){
+            #pragma HLS UNROLL
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         }
         // perform last element of the loop separately (this requires the new val
@@ -84,6 +93,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
         // shift all values in T_m back
         PrecomputationComputeShift:
         for (size_t k = 0; k < m - 1; ++k){
+            #pragma HLS UNROLL
             T_m[k] = T_m[k + 1];
         }
         T_m[m - 1] = Ti;
@@ -92,6 +102,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
     // Push the remaining values
     PrecomputationScatterCacheT:
     for (size_t i = 0; i < m; ++i) {
+        #pragma HLS PIPELINE II=1
         sT.write(T_m[i]);
     }
 }
