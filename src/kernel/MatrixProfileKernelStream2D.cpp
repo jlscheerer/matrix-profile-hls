@@ -503,40 +503,27 @@ void RowReductionUnit(size_t yStage, stream<aggregate_t, stream_d> &rRow_in, str
 }
 
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
+    #pragma HLS INLINE
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
 void StreamToMemory(stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in, data_t *MP, index_t *MPI) {
-    // TODO: Use local cache don't directly write to memory (might be better?) (this way we need to access 3 times!)
-    StreamToMemoryInit:
-    for (size_t i = 0; i < n - m + 1; ++i){
-        // TODO: If this remains move to constant
-        MP[i] = 1e12; // i.e. "positive infinity"
-        MPI[i] = -1;
-    }
+    aggregate_t aggregates_m[n - m + 1];
 
     // Just rows
     StreamToMemoryReduceRows:
     for (size_t i = 0; i < n - m + 1; ++i) {
-        aggregate_t rowAggregate = rRow_in.read();
-        // TODO: Improve this (move out MP?, calculate PearsonCorrelation only once)
-        data_t euclideanDistance = PearsonCorrelationToEuclideanDistance(rowAggregate.value);
-        if (euclideanDistance < MP[i]) {
-            MP[i] = euclideanDistance;
-            MPI[i] = rowAggregate.index;
-        }
+        #pragma HLS PIPLEINE II=1
+        aggregates_m[i] = rRow_in.read();
     }
 
     // Just columns
     StreamToMemoryReduceColumns:
     for (size_t i = 0; i < n - m + 1; ++i) {
+        aggregate_t rowAggregate = aggregates_m[i];
         aggregate_t columnAggregate = rCol_in.read();
-        // TODO: Improve this (move out MP?, calculate PearsonCorrelation only once)
-        data_t euclideanDistance = PearsonCorrelationToEuclideanDistance(columnAggregate.value);
-        if (euclideanDistance < MP[i]) {
-            MP[i] = euclideanDistance;
-            MPI[i] = columnAggregate.index;
-        }
+        MP[i] = PearsonCorrelationToEuclideanDistance(rowAggregate.value > columnAggregate.value ? rowAggregate.value : columnAggregate.value);
+        MPI[i] = rowAggregate.value > columnAggregate.value ? rowAggregate.index : columnAggregate.index;
     }
 }
 
