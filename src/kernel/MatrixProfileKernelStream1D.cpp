@@ -14,11 +14,6 @@ using hls::stream;
 constexpr size_t stream_d = 8;
 
 typedef struct {
-    data_t value;
-    index_t index;
-} aggregate_t;
-
-typedef struct {
     data_t df, dg, inv;
 } compute_t;
 
