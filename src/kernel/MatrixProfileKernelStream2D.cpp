@@ -44,7 +44,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
 
     data_t inv_sum = 0;
     PrecomputationInitInv:
-    for (int k = 0; k < m; ++k){
+    for (size_t k = 0; k < m; ++k){
         #pragma HLS UNROLL
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
     }
@@ -121,7 +121,7 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
     for (size_t i = 0; i < t; ++i) {
         data_t sum = 0;
         MatrixProfileComputeInitQColumn:
-        for (int j = 0; j < m; j++) {
+        for (size_t j = 0; j < m; j++) {
             sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
         }
         QT[i] = sum;
@@ -204,7 +204,7 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     // =============== [Scatter] ===============
     data_t mu = 0, df = 0, dg = 0, inv = 0;
     ScatterDiagonalLane:
-    for (int i = 0; i < n - t * xStage; ++i) {
+    for (size_t i = 0; i < n - t * xStage; ++i) {
         data_t Ti = sT_in.read();
 
         if (i < (n - m + 1 - t * xStage)) {
@@ -448,8 +448,8 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     }
 
     // Just columns
-    RowLaneReduceColumn:
     data_t columnAggregateLength = min((xStage - yStage) * t + t - 1 + t, n - m + 1 - t * yStage);
+    RowLaneReduceColumn:
     for (size_t i = 0; i < columnAggregateLength; ++i) {
         aggregate_t prevColAggregate = (i < (xStage - yStage) * t + t - 1) ? columnAggregate_in.read()
                                                                            : aggregate_t_init;
@@ -469,24 +469,22 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
 }
 
 void RowReductionUnit(size_t yStage, stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in,
-
-        stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in,
-
-        stream<aggregate_t, stream_d> &rRow_out, stream<aggregate_t, stream_d> &rCol_out) {
-    // Just rows
-    // Pass on previous rows
+                      stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in,
+                      stream<aggregate_t, stream_d> &rRow_out, stream<aggregate_t, stream_d> &rCol_out) {
+    // forward row aggregates
     size_t rowAggregateLength = min(t * (yStage + 1), n - m + 1);
     ReductionReduceRow:
     for (size_t i = 0; i < rowAggregateLength; ++i) {
-        aggregate_t rowAggregate = (i < t * yStage) ? rRow_in.read() 
-                                                    : rowAggregate_in.read();
-        rRow_out.write(rowAggregate);
+        #pragma HLS PIPELINE II=1
+        rRow_out.write((i < t * yStage) ? rRow_in.read() 
+                                        : rowAggregate_in.read());
     }
 
-    // Just columns
+    // forward columns & reduce with previous element in case of contention
     size_t columnAggregateLength = n - m + 1;
     ReductionReduceColumn:
     for (size_t i = 0; i < columnAggregateLength; ++i) {
+        #pragma HLS PIPELINE II=1
         // Previous Aggregates
         aggregate_t prevColAggregate = yStage > 0 ? rCol_in.read() 
                                                   : aggregate_t_init;
@@ -494,11 +492,7 @@ void RowReductionUnit(size_t yStage, stream<aggregate_t, stream_d> &rRow_in, str
         aggregate_t colAggregate = (i >= t * yStage) ? columnAggregate_in.read() 
                                                      : aggregate_t_init;
         // Reduce Aggregates using max
-        if (colAggregate.value > prevColAggregate.value) {
-            rCol_out.write(colAggregate);
-        } else {
-            rCol_out.write(prevColAggregate);
-        }
+        rCol_out.write((colAggregate.value > prevColAggregate.value) ? colAggregate : prevColAggregate);
     }
 }
 
@@ -508,16 +502,18 @@ data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
 }
 
 void StreamToMemory(stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in, data_t *MP, index_t *MPI) {
+    // local "cache" storing the row aggregates (to merge them later)
     aggregate_t aggregates_m[n - m + 1];
 
-    // Just rows
+    // read the row-wise aggregates from reduction-lane
     StreamToMemoryReduceRows:
     for (size_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPLEINE II=1
         aggregates_m[i] = rRow_in.read();
     }
 
-    // Just columns
+    // read the column-wise aggregates from reduction-lane, reduce them with
+    // row-wise aggregates and calculate PearsonCorrelation
     StreamToMemoryReduceColumns:
     for (size_t i = 0; i < n - m + 1; ++i) {
         aggregate_t rowAggregate = aggregates_m[i];
