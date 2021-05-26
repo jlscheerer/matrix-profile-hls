@@ -14,7 +14,7 @@
 
 // this macro defines the (type of) implementation to
 // use for the matrix profile kernel
-#define KERNEL_IMPLEMENTATION KERNEL_STREAMLESS
+#define KERNEL_IMPLEMENTATION KERNEL_STREAM2D
 
 // type alias for time series & resulting matrix profile
 using data_t = double;
