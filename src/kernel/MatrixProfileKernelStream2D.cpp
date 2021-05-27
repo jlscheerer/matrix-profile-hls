@@ -439,16 +439,9 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     RowLaneReduceRow:
     for (size_t i = 0; i < t; ++i) {
         #pragma HLS PIPELINE II=1
-        aggregate_t rowAgr = rowAggregate_in.read();
-        // Reduce with current element
-        // TODO: Make this a single read from rowAggregate[i]
-        if (rowAggregate[i].value > rowAgr.value) {
-            // forward our value
-            rowAggregate_out.write(rowAggregate[i]);
-        } else {
-            // take previous value
-            rowAggregate_out.write(rowAgr);
-        }
+        aggregate_t prevRowAggregate = rowAggregate_in.read();
+        aggregate_t curRowAggregate  = rowAggregate[i];
+        rowAggregate_out.write((curRowAggregate.value > prevRowAggregate.value) ? curRowAggregate : prevRowAggregate);
     }
 
     // Just columns
@@ -456,19 +449,9 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     RowLaneReduceColumn:
     for (size_t i = 0; i < columnAggregateLength; ++i) {
         #pragma HLS PIPELINE II=1
-        aggregate_t prevColAggregate = (i < (xStage - yStage) * t + t - 1) ? columnAggregate_in.read()
-                                                                           : aggregate_t_init;
-
-        aggregate_t colAggregate     = (i >= (xStage - yStage) * t) ? columnAggregate[i - (xStage - yStage) * t]
-                                                                    : aggregate_t_init;
-
-        if (colAggregate.value > prevColAggregate.value) {
-            // forward our value
-            columnAggregate_out.write(colAggregate);
-        } else {
-            // take previous value
-            columnAggregate_out.write(prevColAggregate);
-        }
+        aggregate_t prevColAggregate = (i < (xStage - yStage) * t + t - 1) ? columnAggregate_in.read() : aggregate_t_init;
+        aggregate_t curColAggregate  = (i >= (xStage - yStage) * t) ? columnAggregate[i - (xStage - yStage) * t] : aggregate_t_init;
+        columnAggregate_out.write((curColAggregate.value > prevColAggregate.value) ? curColAggregate : prevColAggregate);
     }
     // =============== [/Reduce] ===============
 }
