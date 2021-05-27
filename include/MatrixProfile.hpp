@@ -23,13 +23,14 @@ using data_t = double;
 using index_t = int;
 
 // length of the time series data
-static constexpr size_t n = 128;
+static constexpr size_t n = 8;
 
 // subsequence length for the matrix profile
 static constexpr size_t m = 4;
 
 // "tile-size" (only applicable for Stream2D)
-constexpr size_t t = 16;
+// assumption: t ≥ m
+constexpr size_t t = 4;
 
 // length of the resulting matrix profile (index)
 static constexpr size_t sublen = n - m + 1;

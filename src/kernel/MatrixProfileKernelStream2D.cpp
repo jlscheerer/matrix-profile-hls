@@ -13,8 +13,10 @@
 using hls::stream;
 constexpr size_t stream_d = 3;
 
-// TODO: Just define constexpr constant for the ceilDiv result
-constexpr size_t ceilDiv(const size_t x, const size_t y) { return (x + y - 1) / y; }
+// number of tiles in the first row
+// (n - m + 1) / t⌉ = ⌈sublen / t⌉
+constexpr size_t nTiles = (sublen + t - 1) / t;
+
 constexpr size_t min(const size_t a, const size_t b){ return (a < b) ? a : b; }
 
 void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t, stream_d> &sMu,
@@ -106,8 +108,11 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
 
 void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], data_t (&Tj_m)[t + m - 1], data_t mui_m, data_t (&muj_m)[t], 
                               data_t (&dfi_m)[t], data_t (&dfj_m)[2 * t - 1], data_t (&dgi_m)[t], data_t (&dgj_m)[2 * t - 1], data_t (&invi_m)[t], 
-                              data_t (&invj_m)[2 * t - 1], data_t (&QT)[t], aggregate_t (&rowAggregate)[t], aggregate_t (&columnAggregate)[2 * t - 1]) {
+                              data_t (&invj_m)[2 * t - 1], aggregate_t (&rowAggregate)[t], aggregate_t (&columnAggregate)[2 * t - 1]) {
     #pragma HLS INLINE
+
+    data_t QT[t];
+    
     // Compute the Matrix Profile (here)
     size_t yOffset = yStage * t;
     size_t xOffset = xStage * t;
@@ -205,6 +210,9 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     data_t invi_m[t], invj_m[2 * t - 1];
     #pragma HLS ARRAY_PARTITION variable=invj_m cyclic factor=t
 
+    aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
+    #pragma HLS ARRAY_PARTITION variable=rowAggregate    cyclic factor=t
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=t
     // =============== [Scatter] ===============
     data_t mu = 0, df = 0, dg = 0, inv = 0;
     ScatterDiagonalLane:
@@ -233,15 +241,17 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
             dfi_m[i] = df;
             dgi_m[i] = dg;
             invi_m[i] = inv;
+            rowAggregate[i] = aggregate_t_init;
         }
 
         if (i < 2 * t - 1) {
             dfj_m[i] = df;
             dgj_m[i] = dg;
             invj_m[i] = inv;
+            columnAggregate[i] = aggregate_t_init;
         }
 
-        if (xStage < ceilDiv(n - m + 1, t) - 1) {
+        if (xStage < nTiles - 1) {
             if (i < m)
                 Ti_out.write(Ti);
 
@@ -276,28 +286,11 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     }
     // =============== [/Scatter] ===============
 
-    // =============== [Compute] ===============
-    // TODO: (Move up +) Initialize during scatter
-    data_t QT[t];
+    // =============== [Compute] =============== 
     
-    aggregate_t rowAggregate[t];
-    #pragma HLS ARRAY_PARTITION variable=rowAggregate cyclic factor=t
-    ScatterAggregateInitRow:
-    for (size_t i = 0; i < t; ++i){
-        #pragma HLS PIPELINE II=1
-        rowAggregate[i] = aggregate_t_init;
-    }
-
-    aggregate_t columnAggregate[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=t
-    ScatterAggregateInitColumn:
-    for (size_t i = 0; i < 2 * t - 1; ++i){
-        #pragma HLS PIPELINE II=1
-        columnAggregate[i] = aggregate_t_init;
-    }
-
     // After getting the required data can now compute portion of the matrix profile
-    MatrixProfileComputeUnit(yStage, xStage, Ti_m, Tj_m, mui_m, muj_m, dfi_m, dfj_m, dgi_m, dgj_m, invi_m, invj_m, QT, rowAggregate, columnAggregate);
+    MatrixProfileComputeUnit(yStage, xStage, Ti_m, Tj_m, mui_m, muj_m, dfi_m, dfj_m, dgi_m, dgj_m, invi_m, invj_m, rowAggregate, columnAggregate);
+    
     // =============== [/Compute] ===============
 
     // =============== [Reduce] ===============
@@ -349,6 +342,9 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     data_t invi_m[t], invj_m[2 * t - 1];
     #pragma HLS ARRAY_PARTITION variable=invj_m cyclic factor=t
 
+    aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
+    #pragma HLS ARRAY_PARTITION variable=rowAggregate    cyclic factor=t
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=t
     // =============== [Scatter] ===============
     // RowStreaming: Read Values for the current row
     // TODO: Reformat memory writes
@@ -376,9 +372,10 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
         data_t invi = invi_in.read();
         invi_m[i] = invi;
 
+        rowAggregate[i] = aggregate_t_init;
         // check that we are not the last element
         // if not we can forward elements to the remaining rowElements
-        if (xStage < ceilDiv(n - m + 1, t) - 1) {
+        if (xStage < nTiles - 1) {
             if (i < m)
                 Ti_out.write(Ti);
             if (i == 0)
@@ -413,6 +410,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
             dfj_m[i] = dfj;
             dgj_m[i] = dgj;
             invj_m[i] = invj;
+            columnAggregate[i] = aggregate_t_init;
         }
 
         // do not forward first t elements (only concern current element)
@@ -431,27 +429,9 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
 
     // =============== [Compute] ===============
 
-    // TODO: (Move up +) Initialize during scatter
-    data_t QT[t];
-    
-    aggregate_t rowAggregate[t];
-    #pragma HLS ARRAY_PARTITION variable=rowAggregate cyclic factor=t
-    RowLaneAggregateInitRow:
-    for (size_t i = 0; i < t; ++i){
-        #pragma HLS PIPELINE II=1
-        rowAggregate[i] = aggregate_t_init;
-    }
-
-    aggregate_t columnAggregate[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=t
-    RowLaneAggregateInitColumn:
-    for (size_t i = 0; i < 2 * t - 1; ++i){
-        #pragma HLS PIPELINE II=1
-        columnAggregate[i] = aggregate_t_init;
-    }
-
     // After getting the required data can now compute portion of the matrix profile
-    MatrixProfileComputeUnit(yStage, xStage, Ti_m, Tj_m, mui_m, muj_m, dfi_m, dfj_m, dgi_m, dgj_m, invi_m, invj_m, QT, rowAggregate, columnAggregate);
+    MatrixProfileComputeUnit(yStage, xStage, Ti_m, Tj_m, mui_m, muj_m, dfi_m, dfj_m, dgi_m, dgj_m, invi_m, invj_m, rowAggregate, columnAggregate);
+    
     // =============== [/Compute] ===============
 
     // =============== [Reduce] ===============
@@ -558,7 +538,6 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     
     #pragma HLS DATAFLOW
 
-    constexpr size_t nTiles = ceilDiv(n - m + 1, t);
     constexpr size_t nStreams = ((nTiles + 1) * nTiles) / 2;
 
     // Streams for the Scatter Lane
