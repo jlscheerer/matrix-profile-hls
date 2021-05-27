@@ -10,9 +10,6 @@
 #include "hls_math.h"
 #include "hls_stream.h"
 
-// "tile-size"
-constexpr size_t t = 4;
-
 using hls::stream;
 constexpr size_t stream_d = 3;
 
