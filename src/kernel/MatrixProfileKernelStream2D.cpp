@@ -145,16 +145,18 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
     // Compute (t-1) rows using the simplification
     MatrixProfileComputeRow:
     for (size_t r = 1; r < t; ++r) {
+        data_t dfi = dfi_m[r]; data_t dgi = dgi_m[r];
         // TODO: Pull dfi/dgi out of the loop like in the naive example
         // TODO: Pull invi out of the loop like in the naive example
         MatrixProfileComputeColumn:
         for (size_t i = 0; i < t; ++i) {
+            #pragma HLS PIPELINE II=1
             // by design it will always hold that realX >= realY
             // int realY = (yStage * t + r);
             // int realX = (xStage * t + r + i);
 
             // QT[i] = QT[i] + df[i] * dg[j] + df[j] * dg[i]
-            QT[i] = QT[i] + dfi_m[r] * dgj_m[i + r] + dfj_m[i + r] * dgi_m[r];
+            QT[i] = QT[i] + dfi * dgj_m[i + r] + dfj_m[i + r] * dgi;
             // Calculate Pearson Correlation and Include Exclusion zone
             // Exclusion Zone <==> realX - m/4 <= realY <= realX + m/4
             // 				  <==> (xStage * t + r + i) - m/4 <= yStage * t + r <= (xStage * t + r + i) + m/4
