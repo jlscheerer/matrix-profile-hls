@@ -146,8 +146,6 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
     MatrixProfileComputeRow:
     for (size_t r = 1; r < t; ++r) {
         data_t dfi = dfi_m[r]; data_t dgi = dgi_m[r];
-        // TODO: Pull dfi/dgi out of the loop like in the naive example
-        // TODO: Pull invi out of the loop like in the naive example
         MatrixProfileComputeColumn:
         for (size_t i = 0; i < t; ++i) {
             #pragma HLS PIPELINE II=1
@@ -199,13 +197,16 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
-    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=m
+    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=t
 
     // local "cache" for df/dg for the current row/column
     data_t dfi_m[t], dfj_m[2 * t - 1], dgi_m[t], dgj_m[2 * t - 1];
+    #pragma HLS ARRAY_PARTITION variable=dfj_m cyclic factor=t
+    #pragma HLS ARRAY_PARTITION variable=dgj_m cyclic factor=t
 
     // local "cache" for inverses for the current row/column
     data_t invi_m[t], invj_m[2 * t - 1];
+    #pragma HLS ARRAY_PARTITION variable=invj_m cyclic factor=t
 
     // =============== [Scatter] ===============
     data_t mu = 0, df = 0, dg = 0, inv = 0;
@@ -283,6 +284,7 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     data_t QT[t];
     
     aggregate_t rowAggregate[t];
+    #pragma HLS ARRAY_PARTITION variable=rowAggregate cyclic factor=t
     ScatterAggregateInitRow:
     for (size_t i = 0; i < t; ++i){
         #pragma HLS PIPELINE II=1
@@ -290,6 +292,7 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     }
 
     aggregate_t columnAggregate[2 * t - 1];
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=t
     ScatterAggregateInitColumn:
     for (size_t i = 0; i < 2 * t - 1; ++i){
         #pragma HLS PIPELINE II=1
@@ -338,12 +341,16 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
+    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=t
 
     // local "cache" for df/dg for the current row/column
     data_t dfi_m[t], dfj_m[2 * t - 1], dgi_m[t], dgj_m[2 * t - 1];
+    #pragma HLS ARRAY_PARTITION variable=dfj_m cyclic factor=t
+    #pragma HLS ARRAY_PARTITION variable=dgj_m cyclic factor=t
 
     // local "cache" for inverses for the current row/column
     data_t invi_m[t], invj_m[2 * t - 1];
+    #pragma HLS ARRAY_PARTITION variable=invj_m cyclic factor=t
 
     // =============== [Scatter] ===============
     // RowStreaming: Read Values for the current row
@@ -431,6 +438,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     data_t QT[t];
     
     aggregate_t rowAggregate[t];
+    #pragma HLS ARRAY_PARTITION variable=rowAggregate cyclic factor=t
     RowLaneAggregateInitRow:
     for (size_t i = 0; i < t; ++i){
         #pragma HLS PIPELINE II=1
@@ -438,6 +446,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     }
 
     aggregate_t columnAggregate[2 * t - 1];
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=t
     RowLaneAggregateInitColumn:
     for (size_t i = 0; i < 2 * t - 1; ++i){
         #pragma HLS PIPELINE II=1
