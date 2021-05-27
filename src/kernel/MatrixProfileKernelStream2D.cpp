@@ -111,7 +111,7 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
                               data_t (&invj_m)[2 * t - 1], aggregate_t (&rowAggregate)[t], aggregate_t (&columnAggregate)[2 * t - 1]) {
     #pragma HLS INLINE
 
-    data_t QT[t];
+    data_t QT[t], P[t];
     
     // Compute the Matrix Profile (here)
     size_t yOffset = yStage * t;
@@ -143,39 +143,38 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
         }
     }
 
+    // TODO: Move this out and apply to QInit
+    // Exclusion Zone <==> realX - m/4 <= realY <= realX + m/4
+    // 				  <==> (xStage * t + r + i) - m/4 <= yStage * t + r <= (xStage * t + r + i) + m/4
+    // 				  <==> xStage * t + i - m/4 <= yStage * t <= xStage * t + i + m/4
+    // 				  <==> xStage * t + i - m/4 <= yStage * t [t > 0, xStage >= yStage, i > 0, m/4 > 0]
+    //    			  <==> (xStage - yStage) * t + i - m/4 <= 0
+    // 				  <==> (xStage - yStage) * t - m/4 <= -i
+    //   			  <==> i <= (yStage - xStage) * t + m/4
+    const size_t exclusionZone = (yStage - xStage) * t + m / 4;
+
     // TODO: Heavily optimize this Loop
     // Compute (t-1) rows using the simplification
     MatrixProfileComputeRow:
     for (size_t r = 1; r < t; ++r) {
-        data_t dfi = dfi_m[r]; data_t dgi = dgi_m[r];
+        const size_t stageBounds = min(t, n - m - t * xStage - r + 1);
         MatrixProfileComputeColumn:
-        for (size_t i = 0; i < t; ++i) {
+        for (size_t i = exclusionZone+1; i < stageBounds; ++i) {
             #pragma HLS PIPELINE II=1
-            // by design it will always hold that realX >= realY
-            // int realY = (yStage * t + r);
-            // int realX = (xStage * t + r + i);
+            
+            // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
+            // QT[i] was the previous value (i.e. value diagonally above the current QT[i])
+            QT[i] = QT[i] + dfi_m[r] * dgj_m[i + r] + dfj_m[i + r] * dgi_m[r];
 
-            // QT[i] = QT[i] + df[i] * dg[j] + df[j] * dg[i]
-            QT[i] = QT[i] + dfi * dgj_m[i + r] + dfj_m[i + r] * dgi;
-            // Calculate Pearson Correlation and Include Exclusion zone
-            // Exclusion Zone <==> realX - m/4 <= realY <= realX + m/4
-            // 				  <==> (xStage * t + r + i) - m/4 <= yStage * t + r <= (xStage * t + r + i) + m/4
-            // 				  <==> xStage * t + i - m/4 <= yStage * t <= xStage * t + i + m/4
-            // 				  <==> xStage * t + i - m/4 <= yStage * t [t > 0, xStage >= yStage, i > 0, m/4 > 0]
-            //    			  <==> (xStage - yStage) * t + i - m/4 <= 0
-            // 				  <==> (xStage - yStage) * t - m/4 <= -i
-            //   			  <==> i <= (yStage - xStage) * t + m/4
-            // TODO: Move ExclusionZone and OutOfBounds into custom functions
-            bool exclusionZone = (i <= (yStage - xStage) * t + m / 4);
-            bool outOfBounds = (i > n - m - t * xStage - r);
-            data_t PearsonCorrelation = (!exclusionZone && !outOfBounds) ? QT[i] * invi_m[r] * invj_m[i + r]
-                                                                         : aggregate_init;
-            if (PearsonCorrelation > rowAggregate[r].value) {
-                rowAggregate[r] = {PearsonCorrelation, static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
-            }
-            if (PearsonCorrelation > columnAggregate[r + i].value) {
-                columnAggregate[r + i] = {PearsonCorrelation, static_cast<index_t>(r + yOffset)}; // remember "best" row for columns
-            }
+            // calculate Pearson Correlation
+            P[i] = QT[i] * invi_m[r] * invj_m[i + r];
+            
+            if (P[i] > rowAggregate[r].value)
+                rowAggregate[r] = {P[i], static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
+            
+            const size_t column = r + i;
+            if (P[i] > columnAggregate[column].value)
+                columnAggregate[column] = {P[i], static_cast<index_t>(r + yOffset)}; // remember "best" row for columns
         }
     }
 
@@ -199,20 +198,18 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
-    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=t
-
+    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=m
+    
     // local "cache" for df/dg for the current row/column
     data_t dfi_m[t], dfj_m[2 * t - 1], dgi_m[t], dgj_m[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=dfj_m cyclic factor=t
-    #pragma HLS ARRAY_PARTITION variable=dgj_m cyclic factor=t
 
     // local "cache" for inverses for the current row/column
     data_t invi_m[t], invj_m[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=invj_m cyclic factor=t
 
+    // factor=3 required for fadd and fmul (update if data_t changes)
     aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=rowAggregate    cyclic factor=t
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=t
+    #pragma HLS ARRAY_PARTITION variable=rowAggregate complete
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate complete
     // =============== [Scatter] ===============
     data_t mu = 0, df = 0, dg = 0, inv = 0;
     ScatterDiagonalLane:
@@ -331,20 +328,18 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
-    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=t
-
+    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=m
+    
     // local "cache" for df/dg for the current row/column
     data_t dfi_m[t], dfj_m[2 * t - 1], dgi_m[t], dgj_m[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=dfj_m cyclic factor=t
-    #pragma HLS ARRAY_PARTITION variable=dgj_m cyclic factor=t
 
     // local "cache" for inverses for the current row/column
     data_t invi_m[t], invj_m[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=invj_m cyclic factor=t
 
+    // factor=3 required for fadd and fmul (update if data_t changes)
     aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=rowAggregate    cyclic factor=t
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=t
+    #pragma HLS ARRAY_PARTITION variable=rowAggregate complete
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate complete
     // =============== [Scatter] ===============
     // RowStreaming: Read Values for the current row
     // TODO: Reformat memory writes
@@ -544,7 +539,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         #pragma HLS UNROLL
         // TODO: Move Index into constexpr method
         // x == y
-        index_t beginIndex = (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + y;
+        const index_t beginIndex = (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + y;
         ScatterLaneStreamingUnit(y, y, sT[y], sMu[y], sDf[y], sDg[y], sInv[y], Ti[beginIndex], Tj[beginIndex],
                 mui[beginIndex], muj[beginIndex], dfi[beginIndex], dfj[beginIndex], dgi[beginIndex],
                 dgj[beginIndex], invi[beginIndex], invj[beginIndex], rowAggregate[beginIndex], columnAggregate[beginIndex],
@@ -559,8 +554,9 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
                     Tj[index], mui[index], muj[index], dfi[index], dfj[index], dgi[index], dgj[index], 
                     invi[index], invj[index], rowAggregate[index], columnAggregate[index]);
         }
+
         // x == nTiles - 1
-        index_t endIndex = (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + (nTiles - 1);
+        const index_t endIndex = (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + (nTiles - 1);
         RowReductionUnit(y, rRow[y], rCol[y], rowAggregate[endIndex], columnAggregate[endIndex], rRow[y + 1], rCol[y + 1]);
     }
 
