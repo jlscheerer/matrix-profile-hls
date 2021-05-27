@@ -3,7 +3,7 @@
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
  * @brief   Implementation of the Kernel (C++/Vitis HLS) [Stream-2D]
  */
-// TODO: Maybe move ProcessingElements into individual files
+
 #include "MatrixProfile.hpp"
 #include "kernel/MatrixProfileKernel.hpp"
 
@@ -18,6 +18,9 @@ constexpr size_t stream_d = 3;
 constexpr size_t nTiles = (sublen + t - 1) / t;
 
 constexpr size_t min(const size_t a, const size_t b){ return (a < b) ? a : b; }
+
+// https://math.stackexchange.com/questions/2134011/conversion-of-upper-triangle-linear-index-from-index-on-symmetrical-array
+constexpr size_t index2D(const size_t x, const size_t y) { return (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + x; }
 
 void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t, stream_d> &sMu,
                     stream<data_t, stream_d> &sDf, stream<data_t, stream_d> &sDg, stream<data_t, stream_d> &sInv) {
@@ -530,13 +533,10 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
     MemoryToStream(T, sT[0], sMu[0], sDf[0], sDg[0], sInv[0]);
 
-    // https://math.stackexchange.com/questions/2134011/conversion-of-upper-triangle-linear-index-from-index-on-symmetrical-array
-    // TODO: Potentially Flatten this Loop (OR UNROLL twice?)
+    // TODO: Potentially Flatten this Loop
     for (size_t y = 0; y < nTiles; ++y) {
         #pragma HLS UNROLL
-        // TODO: Move Index into constexpr method
-        // x == y
-        const index_t beginIndex = (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + y;
+        const index_t beginIndex = index2D(y, y);
         ScatterLaneStreamingUnit(y, y, sT[y], sMu[y], sDf[y], sDg[y], sInv[y], Ti[beginIndex], Tj[beginIndex],
                 mui[beginIndex], muj[beginIndex], dfi[beginIndex], dfj[beginIndex], dgi[beginIndex],
                 dgj[beginIndex], invi[beginIndex], invj[beginIndex], rowAggregate[beginIndex], columnAggregate[beginIndex],
@@ -544,16 +544,14 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
         for (size_t x = y + 1; x < nTiles; ++x) {
             #pragma HLS UNROLL
-            index_t index = (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + x;
+            index_t index = index2D(x, y);
             RowLaneStreamingUnit(y, x, Ti[index - 1], Tj[index - 1], mui[index - 1], muj[index - 1],
                     dfi[index - 1], dfj[index - 1], dgi[index - 1], dgj[index - 1], invi[index - 1],
                     invj[index - 1], rowAggregate[index - 1], columnAggregate[index - 1], Ti[index],
                     Tj[index], mui[index], muj[index], dfi[index], dfj[index], dgi[index], dgj[index], 
                     invi[index], invj[index], rowAggregate[index], columnAggregate[index]);
         }
-
-        // x == nTiles - 1
-        const index_t endIndex = (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + (nTiles - 1);
+        const index_t endIndex = index2D(nTiles - 1, y);
         RowReductionUnit(y, rRow[y], rCol[y], rowAggregate[endIndex], columnAggregate[endIndex], rRow[y + 1], rCol[y + 1]);
     }
 
