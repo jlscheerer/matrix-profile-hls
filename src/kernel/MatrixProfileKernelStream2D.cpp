@@ -14,7 +14,7 @@ using hls::stream;
 constexpr size_t stream_d = 3;
 
 // number of tiles in the first row
-// (n - m + 1) / t⌉ = ⌈sublen / t⌉
+// ⌈(n - m + 1) / t⌉ = ⌈sublen / t⌉
 constexpr size_t nTiles = (sublen + t - 1) / t;
 
 constexpr size_t min(const size_t a, const size_t b){ return (a < b) ? a : b; }
@@ -112,38 +112,12 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
     #pragma HLS INLINE
 
     data_t QT[t], P[t];
+    aggregate_t rowAggregate_m = aggregate_t_init;
     
     // Compute the Matrix Profile (here)
-    size_t yOffset = yStage * t;
-    size_t xOffset = xStage * t;
+    const size_t yOffset = yStage * t;
+    const size_t xOffset = xStage * t;
 
-    // Compute the first row of the matrix
-    // TODO: Set row and column aggregate for this loop
-    MatrixProfileComputeInitQRow:
-    for (size_t i = 0; i < t; ++i) {
-        data_t sum = 0;
-        MatrixProfileComputeInitQColumn:
-        for (size_t j = 0; j < m; j++) {
-            #pragma HLS UNROLL
-            sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
-        }
-        QT[i] = sum;
-        // See Proof Related to exclusion zone below
-        // TODO: Move ExclusionZone and OutOfBounds into custom functions
-        // r = 0
-        bool exclusionZone = (i <= (yStage - xStage) * t + m / 4);
-        bool outOfBounds = (i > n - m - t * xStage);
-        data_t PearsonCorrelation = (!exclusionZone && !outOfBounds) ? QT[i] * invi_m[0] * invj_m[i]
-                                                                     : aggregate_init;
-        if (PearsonCorrelation > rowAggregate[0].value) {
-            rowAggregate[0] = {PearsonCorrelation, static_cast<index_t>(i + xOffset)}; // remember "best" column for rows
-        }
-        if (PearsonCorrelation != aggregate_init) {
-            columnAggregate[i] = {PearsonCorrelation, static_cast<index_t>(0 + yOffset)}; // remember "best" row for columns
-        }
-    }
-
-    // TODO: Move this out and apply to QInit
     // Exclusion Zone <==> realX - m/4 <= realY <= realX + m/4
     // 				  <==> (xStage * t + r + i) - m/4 <= yStage * t + r <= (xStage * t + r + i) + m/4
     // 				  <==> xStage * t + i - m/4 <= yStage * t <= xStage * t + i + m/4
@@ -153,13 +127,34 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
     //   			  <==> i <= (yStage - xStage) * t + m/4
     const size_t exclusionZone = (yStage - xStage) * t + m / 4;
 
+    // compute the first row of the matrix
+    MatrixProfileComputeInitQRow:
+    for (size_t i = exclusionZone + 1; i < min(t, n - m + 1 - t * xStage); ++i) {
+        // compute convolution explicitly
+        data_t sum = 0;
+        MatrixProfileComputeInitQColumn:
+        for (size_t j = 0; j < m; j++) {
+            #pragma HLS UNROLL
+            sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
+        }
+        QT[i] = sum;
+        data_t PearsonCorrelation = QT[i] * invi_m[0] * invj_m[i];
+
+        // update aggregates in case of improvement
+        if (PearsonCorrelation > rowAggregate_m.value)
+            rowAggregate_m = {PearsonCorrelation, static_cast<index_t>(i + xOffset)}; // remember "best" column for rows
+        if (PearsonCorrelation != aggregate_init)
+            columnAggregate[i] = {PearsonCorrelation, static_cast<index_t>(0 + yOffset)}; // remember "best" row for columns
+    }
+    rowAggregate[0] = rowAggregate_m;    
+
     // TODO: Heavily optimize this Loop
     // Compute (t-1) rows using the simplification
     MatrixProfileComputeRow:
     for (size_t r = 1; r < t; ++r) {
-        const size_t stageBounds = min(t, n - m - t * xStage - r + 1);
+        rowAggregate_m = aggregate_t_init;
         MatrixProfileComputeColumn:
-        for (size_t i = exclusionZone+1; i < stageBounds; ++i) {
+        for (size_t i = exclusionZone+1; i < min(t, n - m - t * xStage - r + 1); ++i) {
             #pragma HLS PIPELINE II=1
             
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
@@ -169,13 +164,14 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
             // calculate Pearson Correlation
             P[i] = QT[i] * invi_m[r] * invj_m[i + r];
             
-            if (P[i] > rowAggregate[r].value)
-                rowAggregate[r] = {P[i], static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
+            if (P[i] > rowAggregate_m.value)
+                rowAggregate_m = {P[i], static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
             
             const size_t column = r + i;
             if (P[i] > columnAggregate[column].value)
                 columnAggregate[column] = {P[i], static_cast<index_t>(r + yOffset)}; // remember "best" row for columns
         }
+        rowAggregate[r] = rowAggregate_m;
     }
 
 }
@@ -208,7 +204,6 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
 
     // factor=3 required for fadd and fmul (update if data_t changes)
     aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=rowAggregate complete
     #pragma HLS ARRAY_PARTITION variable=columnAggregate complete
     // =============== [Scatter] ===============
     data_t mu = 0, df = 0, dg = 0, inv = 0;
@@ -248,6 +243,8 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
             columnAggregate[i] = aggregate_t_init;
         }
 
+        // check that we are not the last element
+        // if not we can forward elements to the remaining elements
         if (xStage < nTiles - 1) {
             if (i < m)
                 Ti_out.write(Ti);
@@ -338,7 +335,6 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
 
     // factor=3 required for fadd and fmul (update if data_t changes)
     aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=rowAggregate complete
     #pragma HLS ARRAY_PARTITION variable=columnAggregate complete
     // =============== [Scatter] ===============
     // RowStreaming: Read Values for the current row
@@ -368,6 +364,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
         invi_m[i] = invi;
 
         rowAggregate[i] = aggregate_t_init;
+
         // check that we are not the last element
         // if not we can forward elements to the remaining rowElements
         if (xStage < nTiles - 1) {
