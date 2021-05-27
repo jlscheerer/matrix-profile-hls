@@ -122,6 +122,7 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
         data_t sum = 0;
         MatrixProfileComputeInitQColumn:
         for (size_t j = 0; j < m; j++) {
+            #pragma HLS UNROLL
             sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
         }
         QT[i] = sum;
@@ -191,9 +192,12 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
         stream<data_t, stream_d> &sInv_out) {
     // local "cache" for time series values for the current row/column
     data_t Ti_m[m], Tj_m[t + m - 1];
+    #pragma HLS ARRAY_PARTITION variable=Ti_m complete
+    #pragma HLS ARRAY_PARTITION variable=Tj_m cyclic factor=m
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
+    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=m
 
     // local "cache" for df/dg for the current row/column
     data_t dfi_m[t], dfj_m[2 * t - 1], dgi_m[t], dgj_m[2 * t - 1];
@@ -327,6 +331,8 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
         stream<aggregate_t, stream_d> &rowAggregate_out, stream<aggregate_t, stream_d> &columnAggregate_out) {
     // local "cache" for time series values for the current row/column
     data_t Ti_m[m], Tj_m[t + m - 1];
+    #pragma HLS ARRAY_PARTITION variable=Ti_m complete
+    #pragma HLS ARRAY_PARTITION variable=Tj_m cyclic factor=m
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
