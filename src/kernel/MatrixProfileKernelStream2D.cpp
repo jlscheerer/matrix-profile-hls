@@ -205,6 +205,7 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     data_t mu = 0, df = 0, dg = 0, inv = 0;
     ScatterDiagonalLane:
     for (size_t i = 0; i < n - t * xStage; ++i) {
+        #pragma HLS PIPELINE II=1
         data_t Ti = sT_in.read();
 
         if (i < (n - m + 1 - t * xStage)) {
@@ -278,12 +279,14 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     aggregate_t rowAggregate[t];
     ScatterAggregateInitRow:
     for (size_t i = 0; i < t; ++i){
+        #pragma HLS PIPELINE II=1
         rowAggregate[i] = aggregate_t_init;
     }
 
     aggregate_t columnAggregate[2 * t - 1];
     ScatterAggregateInitColumn:
     for (size_t i = 0; i < 2 * t - 1; ++i){
+        #pragma HLS PIPELINE II=1
         columnAggregate[i] = aggregate_t_init;
     }
 
@@ -297,12 +300,14 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     size_t rowAggregateLength = min(t, n - m + 1 - t * yStage);
     ScatterReduceAggregateRow:
     for (size_t i = 0; i < rowAggregateLength; ++i) {
+        #pragma HLS PIPELINE II=1
         rowAggregate_out.write(rowAggregate[i]);
     }
     // Just column
     size_t columnAggregateLength = min(t + (t - 1), n - m + 1 - t * yStage);
     ScatterReduceAggregateColumn:
     for (size_t i = 0; i < columnAggregateLength; ++i) {
+        #pragma HLS PIPELINE II=1
         columnAggregate_out.write(columnAggregate[i]);
     }
     // =============== [/Reduce] ===============
@@ -338,6 +343,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     data_t Ti = 0, mui = 0;
     RowLaneScatterRow:
     for (size_t i = 0; i < t; ++i) {
+        #pragma HLS PIPELINE II=1
         if (i < m) {
             Ti = Ti_in.read();
             Ti_m[i] = Ti;
@@ -375,6 +381,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     data_t muj = 0, dfj = 0, dgj = 0, invj = 0;
     RowLaneScatterColumn:
     for (size_t i = 0; i < (n - t * xStage); ++i) {
+        #pragma HLS PIPELINE II=1
         data_t Tj = Tj_in.read();
 
         if (i < (n - m + 1 - t * xStage)) {
@@ -418,12 +425,14 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     aggregate_t rowAggregate[t];
     RowLaneAggregateInitRow:
     for (size_t i = 0; i < t; ++i){
+        #pragma HLS PIPELINE II=1
         rowAggregate[i] = aggregate_t_init;
     }
 
     aggregate_t columnAggregate[2 * t - 1];
     RowLaneAggregateInitColumn:
     for (size_t i = 0; i < 2 * t - 1; ++i){
+        #pragma HLS PIPELINE II=1
         columnAggregate[i] = aggregate_t_init;
     }
 
@@ -435,6 +444,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     // Just rows
     RowLaneReduceRow:
     for (size_t i = 0; i < t; ++i) {
+        #pragma HLS PIPELINE II=1
         aggregate_t rowAgr = rowAggregate_in.read();
         // Reduce with current element
         // TODO: Make this a single read from rowAggregate[i]
@@ -451,6 +461,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     data_t columnAggregateLength = min((xStage - yStage) * t + t - 1 + t, n - m + 1 - t * yStage);
     RowLaneReduceColumn:
     for (size_t i = 0; i < columnAggregateLength; ++i) {
+        #pragma HLS PIPELINE II=1
         aggregate_t prevColAggregate = (i < (xStage - yStage) * t + t - 1) ? columnAggregate_in.read()
                                                                            : aggregate_t_init;
 
