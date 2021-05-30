@@ -7,7 +7,7 @@ cmake ..
 make host
 make compile
 make link
-make package
+make package_sd
 ```
 
 ### Launch the Emulator
