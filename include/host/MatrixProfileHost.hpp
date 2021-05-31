@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "../MatrixProfile.hpp"
+#include "Config.hpp"
 
 static const std::string KernelTLF{"MatrixProfileKernelTLF"};
 static const std::string versionName{

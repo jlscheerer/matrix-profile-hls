@@ -4,7 +4,7 @@
  * @brief   Implementation of the Kernel (C++/Vitis HLS) [Streamless]
  */
 
-#include "MatrixProfile.hpp"
+#include "Config.hpp"
 #include "kernel/MatrixProfileKernel.hpp"
 
 #include "hls_math.h"

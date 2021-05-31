@@ -13,7 +13,7 @@
 #include "cxxopts.hpp"
 #include "optional.hpp"
 
-#include "MatrixProfile.hpp"
+#include "Config.hpp"
 
 #include "host/MatrixProfileHost.hpp"
 #include "host/OpenCL.hpp"
