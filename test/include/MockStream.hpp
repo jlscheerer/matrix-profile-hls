@@ -2,8 +2,17 @@
 
 #include <iostream>
 #include <queue>
+#include <stdexcept>
 
 namespace mock {
+
+    static bool all_streams_empty{true};
+    static bool read_from_empty_stream{false};
+
+    static void reset(){
+        all_streams_empty = true;
+        read_from_empty_stream = false;
+    }
 
     template<typename T, size_t depth>
     class stream {
@@ -15,14 +24,14 @@ namespace mock {
             }
             T read(){
                 if(!m_queue.size()){
-                    // TODO: Throw Error here!
-                    std::cout << "Trying to read from empty stream!" << std::endl;
+                    read_from_empty_stream = true;
                     return T();
                 }
                 T result{m_queue.front()};
                 m_queue.pop();
                 return result;
             }
+            ~stream(){ all_streams_empty &= m_queue.size() == 0; }
     };
 
 };
