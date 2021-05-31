@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 project(MatrixProfileHLS)
 
+set(CMAKE_CXX_STANDARD 11)
+
 # Matrix Profile Computation Options
 set(MP_DATA_TYPE "double" CACHE STRING "type for time series & resulting matrix profile")
 set(MP_INDEX_TYPE "int" CACHE STRING "type for the resulting matrix profile index")
@@ -13,6 +15,10 @@ set(MP_KERNEL "Stream2D" CACHE STRING "implementation to use for the matrix prof
 
 set(MP_AGGREGATE_INIT "-1e12" CACHE STRING "\"negative infinity\" used to initialize aggregates")
 set(MP_INDEX_INIT "-1" CACHE STRING "used to indicate an invalid/undetermined index")
+
+# Custom option to enable software testing using google-test
+# Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
+option(BUILD_TESTS "Build software tests (google-test)" OFF)
 
 # Create the configuration file
 configure_file(include/Config.hpp.in Config.hpp)
@@ -68,5 +74,31 @@ set(PACKAGE_COMMAND
 
 add_custom_target(package_sd COMMAND ${VITIS_COMPILER} --target hw_emu ${PACKAGE_COMMAND} "${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin")
 
-# Launch Emulator
-add_custom_target(launch_emulator COMMAND source "${CMAKE_CURRENT_BINARY_DIR}/package/launch_hw_emu.sh")
+# Software Testing
+if (BUILD_TESTS)
+
+    # make sure to clone respositore with --recursive
+    # or download via git submodule update --init 
+    add_subdirectory(googletest)
+
+    enable_testing()
+
+    include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+    include_directories(${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/test/include)
+
+    add_executable(runStreamlessKernelTests "${PROJECT_SOURCE_DIR}/test/TestStreamlessKernel.cpp")
+    target_link_libraries(runStreamlessKernelTests gtest gtest_main)
+
+    add_executable(runStream1DKernelTests "${PROJECT_SOURCE_DIR}/test/TestStream1DKernel.cpp")
+    target_link_libraries(runStream1DKernelTests gtest gtest_main)
+
+    add_executable(runStream2DKernelTests "${PROJECT_SOURCE_DIR}/test/TestStream2DKernel.cpp")
+    target_link_libraries(runStream2DKernelTests gtest gtest_main)
+
+    # This is so you can do 'make test' to see all tests run, instead of
+    # manually running the executable runUnitTests to see those specific tests.
+    add_test(NAME TestStreamlessKernel COMMAND runStreamlessKernelTests)
+    add_test(NAME TestStream1DKernel COMMAND runStream1DKernelTests)
+    add_test(NAME TestStream2DKernel COMMAND runStream2DKernelTests)
+
+endif()
