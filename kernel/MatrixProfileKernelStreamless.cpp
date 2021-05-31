@@ -4,10 +4,12 @@
  * @brief   Implementation of the Kernel (C++/Vitis HLS) [Streamless]
  */
 
-#include "Config.hpp"
-#include "kernel/MatrixProfileKernel.hpp"
+#if !defined(TEST_MOCK_SW)
+    #include "Config.hpp"
+    #include "kernel/MatrixProfileKernel.hpp"
 
-#include "hls_math.h"
+    #include "hls_math.h"
+#endif
 
 void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data_t (&df)[sublen], data_t (&dg)[sublen], data_t (&inv)[sublen], 
                                      data_t (&QT)[sublen], data_t (&P)[sublen], aggregate_t (&rowAggregate)[sublen], aggregate_t (&columnAggregate)[sublen]) {

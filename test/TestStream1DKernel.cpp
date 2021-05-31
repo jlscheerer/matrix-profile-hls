@@ -1,20 +1,18 @@
-#include "gtest/gtest.h"
+#include "MatrixProfileTests.hpp"
 
-#include <cstdlib>
-#include <cmath>
-
-// wrapper struct to have multiple StreamlessKernel instances
+// wrapper struct to have multiple Stream1DKernel instances
 // with different confugrations (data_t, index_t, n, m)
 // this allows for multiple test (without having to recompile)
 template<typename data_t, typename index_t, size_t n, size_t m>
-struct StreamlessKernel {
-    #include "MatrixProfileKernelStreamless.cpp"
+struct Stream1DKernel {
+    #include "MockConfig.hpp"
+    #include "MatrixProfileKernelStream1D.cpp"
 };
 
-TEST(TestStreamlessKernel, TestSmall8Syn) {
+TEST(TestStream1DKernel, TestSmall8Syn) {
     EXPECT_EQ(0, 0);
 }
 
-TEST(TestStreamlessKernel, TestSmall16Syn) {
+TEST(TestStream1DKernel, TestSmall16Syn) {
     EXPECT_EQ(0, 0);
 }

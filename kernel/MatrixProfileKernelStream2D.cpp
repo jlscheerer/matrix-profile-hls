@@ -4,23 +4,26 @@
  * @brief   Implementation of the Kernel (C++/Vitis HLS) [Stream-2D]
  */
 
-#include "Config.hpp"
-#include "kernel/MatrixProfileKernel.hpp"
+#if !defined(TEST_MOCK_SW)
+    #include "Config.hpp"
+    #include "kernel/MatrixProfileKernel.hpp"
 
-#include "hls_math.h"
-#include "hls_stream.h"
+    #include "hls_math.h"
+    #include "hls_stream.h"
 
-using hls::stream;
-constexpr size_t stream_d = 3;
+    using hls::stream;
+#endif
+
+static constexpr size_t stream_d = 3;
 
 // number of tiles in the first row
 // ⌈(n - m + 1) / t⌉ = ⌈sublen / t⌉
-constexpr size_t nTiles = (sublen + t - 1) / t;
+static constexpr size_t nTiles = (sublen + t - 1) / t;
 
-constexpr size_t min(const size_t a, const size_t b){ return (a < b) ? a : b; }
+static constexpr size_t min(const size_t a, const size_t b){ return (a < b) ? a : b; }
 
 // https://math.stackexchange.com/questions/2134011/conversion-of-upper-triangle-linear-index-from-index-on-symmetrical-array
-constexpr size_t index2D(const size_t x, const size_t y) { return (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + x; }
+static constexpr size_t index2D(const size_t x, const size_t y) { return (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + x; }
 
 void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t, stream_d> &sMu,
                     stream<data_t, stream_d> &sDf, stream<data_t, stream_d> &sDg, stream<data_t, stream_d> &sInv) {

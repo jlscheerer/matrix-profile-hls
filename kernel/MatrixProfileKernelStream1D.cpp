@@ -4,14 +4,17 @@
  * @brief   Implementation of the Kernel (C++/Vitis HLS) [Stream-1D]
  */
 
-#include "Config.hpp"
-#include "kernel/MatrixProfileKernel.hpp"
+#if !defined(TEST_MOCK_SW)
+    #include "Config.hpp"
+    #include "kernel/MatrixProfileKernel.hpp"
 
-#include "hls_math.h"
-#include "hls_stream.h"
+    #include "hls_math.h"
+    #include "hls_stream.h"
 
-using hls::stream;
-constexpr size_t stream_d = 8;
+    using hls::stream;
+#endif
+
+static constexpr size_t stream_d = 8;
 
 typedef struct {
     data_t df, dg, inv;
@@ -101,7 +104,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<comput
     }
 }
 
-constexpr bool ExclusionZone(size_t i, size_t j) {
+const bool ExclusionZone(size_t i, size_t j) {
     // Exclusion Zone <==> i - m/4 <= j <= i + m/4
     // 				  <==> j <= i + m/4 [i <= j, m > 0]
     return j <= i + m / 4;
