@@ -11,7 +11,7 @@ make package_sd
 ```
 
 ### Launch the Emulator
-In the /build run:
+In the /build directory run:
 ```bash
 ./package/launch_hw_emu.sh
 ```

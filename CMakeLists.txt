@@ -20,13 +20,13 @@ set(HOST_LINK_COMMAND
     -L/opt/xilinx/petalinux/sysroots/aarch64-xilinx-linux/usr/lib/
     --sysroot=/opt/xilinx/petalinux/sysroots/aarch64-xilinx-linux)
 
-add_custom_target(host COMMAND ${HOST_COMPILER} ${HOST_COMPILE_COMMAND} -o "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o" "${CMAKE_CURRENT_SOURCE_DIR}/src/host/MatrixProfileHost.cpp"
+add_custom_target(host COMMAND ${HOST_COMPILER} ${HOST_COMPILE_COMMAND} -o "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o" "${CMAKE_CURRENT_SOURCE_DIR}/host/MatrixProfileHost.cpp"
                        COMMAND ${HOST_COMPILER} -o "${CMAKE_CURRENT_BINARY_DIR}/matrix-profile-hls" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o" ${HOST_LINK_COMMAND})
 
 # Kernel (Compile & Link)
 set(KERNEL_COMPILE_COMMAND
     --compile 
-    -I"${CMAKE_CURRENT_SOURCE_DIR}/src/kernel"
+    -I"${CMAKE_CURRENT_SOURCE_DIR}/kernel"
     --config "${CMAKE_CURRENT_SOURCE_DIR}/config/common-config.cfg"
     --config "${CMAKE_CURRENT_SOURCE_DIR}/config/compile-config.cfg"
     -I"${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -36,7 +36,7 @@ set(KERNEL_LINK_COMMAND
     --config "${CMAKE_CURRENT_SOURCE_DIR}/config/common-config.cfg"
     --config "${CMAKE_CURRENT_SOURCE_DIR}/config/link-config.cfg")
 
-add_custom_target(compile COMMAND ${VITIS_COMPILER} --target hw_emu ${KERNEL_COMPILE_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/src/kernel/MatrixProfileKernel.cpp")
+add_custom_target(compile COMMAND ${VITIS_COMPILER} --target hw_emu ${KERNEL_COMPILE_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel.cpp")
 
 add_custom_target(link COMMAND ${VITIS_COMPILER} --target hw_emu ${KERNEL_LINK_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo")
 
