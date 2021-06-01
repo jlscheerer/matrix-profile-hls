@@ -165,7 +165,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
         // exclusionZone integrated into loop bounds
         // exclusionZone <==> row - m/4 <= column <= row + m/4
-        //               <==> column <= row + m/4 [(row <= column, m > 0) ==> row - -m/4 <= column]
+        //               <==> column <= row + m/4 [(row <= column, m > 0) ==> row - m/4 <= column]
         //               <==> row + k <= row + m/4
         //               <==> k <= m/4
         MatrixProfileComputeColumn:
