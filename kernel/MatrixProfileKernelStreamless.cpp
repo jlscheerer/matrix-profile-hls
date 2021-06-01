@@ -104,8 +104,8 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
         rowAggregate[i - m + 1] = aggregate_t_init;
         
         bool exclusionZone = (i - m + 1) <= m / 4;
-        if(!exclusionZone) columnAggregate[i - m + 1] = aggregate_t_init;
-        else columnAggregate[i - m + 1] = {P[i - m + 1], 0};
+        if(!exclusionZone) columnAggregate[i - m + 1] = {P[i - m + 1], 0};
+        else columnAggregate[i - m + 1] = aggregate_t_init;
 
         if (!exclusionZone && P[i - m + 1] > rowAggregate_m.value)
             rowAggregate_m = {P[i - m + 1], static_cast<index_t>(i - m + 1)};
@@ -169,7 +169,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         //               <==> row + k <= row + m/4
         //               <==> k <= m/4
         MatrixProfileComputeColumn:
-        for (size_t k = (m / 4) + 1; k < sublen - row; ++k) {
+        for (size_t k = (m / 4); k < sublen - row; ++k) {
             #pragma HLS PIPELINE II=1
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
