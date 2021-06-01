@@ -107,7 +107,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<comput
 const bool ExclusionZone(size_t i, size_t j) {
     // Exclusion Zone <==> i - m/4 <= j <= i + m/4
     // 				  <==> j <= i + m/4 [i <= j, m > 0]
-    return j <= i + m / 4;
+    return j < i + m / 4;
 }
 
 // TODO: Can optimize exclusionZone either every result will be in the exclusionZone or none
