@@ -12,7 +12,3 @@ struct StreamlessKernel: public MatrixProfileKernel<data_t, index_t, n, m> {
 TEST(TestStreamlessKernel, TestSmall8Syn) {
     EXPECT_EQ(0, 0);
 }
-
-TEST(TestStreamlessKernel, TestSmall16Syn) {
-    EXPECT_EQ(0, 0);
-}

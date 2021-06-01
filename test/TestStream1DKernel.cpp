@@ -9,12 +9,17 @@ struct Stream1DKernel: public MatrixProfileKernel<data_t, index_t, n, m> {
     #include "MatrixProfileKernelStream1D.cpp"
 };
 
-TEST(TestStream1DKernel, TestSmall8Syn) {
+TEST(TestStream1DKernel, TestSmall8SynM4) {
     Stream1DKernel<double, int, 8, 4> kernel;
-    std::array<double, 8> T{1,4,9,16,25,36,49,64};
-    TestMatrixProfileKernel(kernel, T);
+    TestMatrixProfileKernel(kernel, "small8_syn.txt");
 }
 
-TEST(TestStream1DKernel, TestSmall16Syn) {
-    EXPECT_EQ(0, 0);
+TEST(TestStream1DKernel, TestSmall16SynM4) {
+    Stream1DKernel<double, int, 16, 4> kernel;
+    TestMatrixProfileKernel(kernel, "small16_syn.txt");
+}
+
+TEST(TestStream1DKernel, TestSmall128SynM4) {
+    Stream1DKernel<double, int, 128, 4> kernel;
+    TestMatrixProfileKernel(kernel, "small128_syn.txt");
 }

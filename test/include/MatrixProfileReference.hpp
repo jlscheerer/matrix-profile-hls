@@ -9,6 +9,18 @@ namespace Reference {
 
     namespace Internal {
 
+        template<typename index_t>
+        constexpr index_t IndexInit();
+
+        template<>
+        constexpr int IndexInit() { return -1; }
+
+        template<typename data_t>
+        constexpr data_t AggregateInit();
+
+        template<>
+        constexpr double AggregateInit() { return -1e12; }
+
         template<typename data_t, size_t n, size_t m>
         std::array<data_t, n - m + 1> MovMean(const std::array<data_t, n> &T) {
             std::array<data_t, n - m + 1> mu{0};
@@ -79,9 +91,8 @@ namespace Reference {
         std::array<data_t, n - m + 1> inv{ComputeInv<data_t, n, m>(T, mu)};
 
         // Initialize Results
-        // TODO: Use Type appropriate initializer
-        std::fill(MP.begin(), MP.end(), -1e12);
-        std::fill(MPI.begin(), MPI.end(), -1);
+        std::fill(MP.begin(), MP.end(), AggregateInit<data_t>());
+        std::fill(MPI.begin(), MPI.end(), IndexInit<index_t>());
 
         // Compute the first Row of the Matrix
         std::array<data_t, n - m + 1> QT;

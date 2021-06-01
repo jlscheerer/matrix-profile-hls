@@ -12,7 +12,3 @@ struct Stream2DKernel: public MatrixProfileKernel<data_t, index_t, n, m> {
 TEST(TestStream2DKernel, TestSmall8Syn) {
     EXPECT_EQ(0, 0);
 }
-
-TEST(TestStream2DKernel, TestSmall16Syn) {
-    EXPECT_EQ(0, 0);
-}

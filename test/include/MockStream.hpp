@@ -4,12 +4,12 @@
 #include <queue>
 #include <stdexcept>
 
-namespace mock {
+namespace Mock {
 
     static bool all_streams_empty{true};
     static bool read_from_empty_stream{false};
 
-    static void reset(){
+    static void Reset(){
         all_streams_empty = true;
         read_from_empty_stream = false;
     }
