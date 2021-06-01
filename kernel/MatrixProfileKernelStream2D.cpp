@@ -135,7 +135,7 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
 
     // compute the first row of the matrix
     MatrixProfileComputeInitQRow:
-    for (size_t i = exclusionZone + 1; i < min(t, n - m + 1 - t * xStage); ++i) {
+    for (size_t i = exclusionZone; i < min(t, n - m + 1 - t * xStage); ++i) {
         // compute convolution explicitly
         data_t sum = 0;
         MatrixProfileComputeInitQColumn:
@@ -160,7 +160,7 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
     for (size_t r = 1; r < t; ++r) {
         rowAggregate_m = aggregate_t_init;
         MatrixProfileComputeColumn:
-        for (size_t i = exclusionZone+1; i < min(t, n - m - t * xStage - r + 1); ++i) {
+        for (size_t i = exclusionZone; i < min(t, n - m - t * xStage - r + 1); ++i) {
             #pragma HLS PIPELINE II=1
             
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
