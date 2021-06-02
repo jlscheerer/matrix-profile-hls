@@ -33,13 +33,3 @@ TEST(TestStreamlessKernel, TestBenchmark1024SynM20) {
     StreamlessKernel<double, int, 1024, 20> kernel;
     TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
 }
-
-TEST(TestStreamlessKernel, TestBenchmark1024SynM4F) {
-    StreamlessKernel<float, int, 1024, 4> kernel;
-    TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
-}
-
-TEST(TestStreamlessKernel, TestBenchmark1024SynM20F) {
-    StreamlessKernel<float, int, 1024, 20> kernel;
-    TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
-}
