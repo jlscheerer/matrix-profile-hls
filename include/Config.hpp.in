@@ -30,10 +30,10 @@ static constexpr index_t t = ${MP_SIZE_T};
 static constexpr index_t sublen = n - m + 1;
 
 // "negative infinity" used to initialize aggregates
-static constexpr data_t aggregate_init = AggregateInit<data_t>();
+static constexpr data_t aggregate_init = MatrixProfileConfig::AggregateInit<data_t>();
 
 // used to indicate an invalid/undetermined index
-static constexpr index_t index_init = IndexInit<index_t>();
+static constexpr index_t index_init = MatrixProfileConfig::IndexInit<index_t>();
 
 // "translate" the selected kernel implementation (type) to a readable string
 #define KERNEL_IMPL_NAME "v${MP_KERNEL}"
