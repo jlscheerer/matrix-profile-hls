@@ -1,5 +1,4 @@
 # Matrix Profile Computation on FPGA
-=============================================
 
 [![Build Status](https://travis-ci.com/jlscheerer/matrix-profile-hls.svg?token=dmssrYE2KgMinUZ9Pecp&branch=master)](https://travis-ci.com/jlscheerer/matrix-profile-hls)
 
