@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.com/jlscheerer/matrix-profile-hls.svg?token=dmssrYE2KgMinUZ9Pecp&branch=master)](https://travis-ci.com/jlscheerer/matrix-profile-hls)
 [![Xilinx Vitis](https://img.shields.io/badge/Powered%20by-Xilinx%20Vitis-orange.svg)](https://www.xilinx.com/products/design-tools/vitis/vitis-platform.html)
-[![BSD3 License](https://img.shields.io/badge/License-BSDv3-green.svg)](LICENSE.md)
+[![BSD3 License](https://img.shields.io/badge/License-BSDv3-blue.svg)](LICENSE.md)
 
 ### Configuration and Building
 ```bash
