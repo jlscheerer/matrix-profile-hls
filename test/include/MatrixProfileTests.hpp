@@ -15,6 +15,9 @@ using Mock::stream;
 
 #include "MatrixProfileReference.hpp"
 
+#define aggregate_t_init (aggregate_t){aggregate_init, index_init}
+#define sublen (n - m + 1)
+
 template<typename data_t, typename index_t, size_t n, size_t m>
 struct MatrixProfileKernel {
     virtual void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) = 0;
@@ -24,10 +27,10 @@ template<typename data_t>
 constexpr data_t Epsilon();
 
 template<>
-constexpr double Epsilon() { return DBL_EPSILON; }
+constexpr double Epsilon() { return 1e-12; }
 
 template<>
-constexpr float Epsilon() { return FLT_EPSILON; }
+constexpr float Epsilon() { return 1e-10; }
 
 template<typename data_t>
 bool ApproximatelyEqual(data_t expected, data_t actual) {
@@ -47,7 +50,7 @@ void TestMatrixProfileKernel(MatrixProfileKernel<data_t, index_t, n, m> &kernel,
     ASSERT_EQ(Mock::read_from_empty_stream, false);
     // validate matrix profile
     for(size_t i = 0; i < n - m + 1; ++i)
-        ASSERT_TRUE(ApproximatelyEqual(MPExpected[i], MP[i]));
+        ASSERT_DOUBLE_EQ(MPExpected[i], MP[i]);
     // validate matrix profile index
     for(size_t i = 0; i < n - m + 1; ++i)
         ASSERT_EQ(MPIExpected[i], MPI[i]);

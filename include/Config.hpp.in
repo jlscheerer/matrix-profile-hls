@@ -29,8 +29,6 @@ static constexpr index_t t = ${MP_SIZE_T};
 // length of the resulting matrix profile (index)
 static constexpr index_t sublen = n - m + 1;
 
-// TODO: Determine Init Values using Templated Function Automatically
-
 // "negative infinity" used to initialize aggregates
 static constexpr data_t aggregate_init = AggregateInit<data_t>();
 

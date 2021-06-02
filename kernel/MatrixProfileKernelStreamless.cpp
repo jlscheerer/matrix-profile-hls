@@ -103,7 +103,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
 
         rowAggregate[i - m + 1] = aggregate_t_init;
         
-        bool exclusionZone = (i - m + 1) <= m / 4;
+        bool exclusionZone = (i - m + 1) < m / 4;
         if(!exclusionZone) columnAggregate[i - m + 1] = {P[i - m + 1], 0};
         else columnAggregate[i - m + 1] = aggregate_t_init;
 

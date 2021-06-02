@@ -15,6 +15,9 @@ namespace Reference {
         template<>
         constexpr double AggregateInit() { return -1e12; }
 
+        template<>
+        constexpr float AggregateInit() { return -1e12; }
+
         template<typename index_t>
         constexpr index_t IndexInit();
 

@@ -24,7 +24,22 @@ TEST(TestStream1DKernel, TestSmall128SynM4) {
     TestMatrixProfileKernel(kernel, "synthetic/small128_syn.txt");
 }
 
-TEST(TestStream1DKernel, TestBenchmark16384SynM4) {
+TEST(TestStream1DKernel, TestBenchmark1024SynM4) {
     Stream1DKernel<double, int, 1024, 4> kernel;
+    TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
+}
+
+TEST(TestStream1DKernel, TestBenchmark1024SynM20) {
+    Stream1DKernel<double, int, 1024, 20> kernel;
+    TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
+}
+
+TEST(TestStream1DKernel, TestBenchmark1024SynM4F) {
+    Stream1DKernel<float, int, 1024, 4> kernel;
+    TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
+}
+
+TEST(TestStream1DKernel, TestBenchmark1024SynM20F) {
+    Stream1DKernel<float, int, 1024, 20> kernel;
     TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
 }

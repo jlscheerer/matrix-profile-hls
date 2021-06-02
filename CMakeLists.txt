@@ -13,9 +13,6 @@ set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream2D) [assumpti
 
 set(MP_KERNEL "Stream2D" CACHE STRING "implementation to use for the matrix profile kernel {Streamless, Stream1D, Stream2D}")
 
-set(MP_AGGREGATE_INIT "-1e12" CACHE STRING "\"negative infinity\" used to initialize aggregates")
-set(MP_INDEX_INIT "-1" CACHE STRING "used to indicate an invalid/undetermined index")
-
 # Custom option to enable software testing using google-test
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
 option(BUILD_TESTS "Build software tests (google-test)" OFF)

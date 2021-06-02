@@ -1,14 +1,14 @@
 
 #pragma once
 
-template<typename data_t>
-constexpr data_t AggregateInit();
+template<typename T>
+static constexpr T AggregateInit();
 
 template<>
-constexpr double AggregateInit() { return -1e12; }
+static constexpr double AggregateInit() { return -1e12; }
 
-template<typename index_t>
-constexpr index_t IndexInit();
+template<typename T>
+static constexpr index_t IndexInit();
 
 template<>
-constexpr int IndexInit() { return -1; }
+static constexpr int IndexInit() { return -1; }
