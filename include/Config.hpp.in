@@ -15,17 +15,17 @@ using data_t = double;
 using index_t = int;
 
 // length of the time series data
-static constexpr size_t n = ${MP_SIZE_N};
+static constexpr index_t n = ${MP_SIZE_N};
 
 // subsequence length for the matrix profile
-static constexpr size_t m = ${MP_SIZE_M};
+static constexpr index_t m = ${MP_SIZE_M};
 
 // "tile-size" (only applicable for Stream2D)
 // assumption: t ≥ m
-static constexpr size_t t = ${MP_SIZE_T};
+static constexpr index_t t = ${MP_SIZE_T};
 
 // length of the resulting matrix profile (index)
-static constexpr size_t sublen = n - m + 1;
+static constexpr index_t sublen = n - m + 1;
 
 // TODO: Determine Init Values using Templated Function Automatically
 

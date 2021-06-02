@@ -24,7 +24,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
     #pragma HLS ARRAY_PARTITION variable=Ti_m complete
 
     PrecomputationInitT:
-    for (size_t i = 0; i < m; ++i) {
+    for (index_t i = 0; i < m; ++i) {
         #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
         T_m[i] = T_i;
@@ -33,7 +33,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
 
     data_t mean = 0;
     PrecomputationInitMu:
-    for(size_t i = 0; i < m; ++i){
+    for(index_t i = 0; i < m; ++i){
         #pragma HLS UNROLL
         mean += T_m[i];
     }
@@ -44,7 +44,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
 
     data_t inv_sum = 0, qt_sum = 0;
     PrecomputationInitInvQT:
-    for (size_t k = 0; k < m; ++k) {
+    for (index_t k = 0; k < m; ++k) {
         #pragma HLS UNROLL
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
@@ -60,7 +60,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
     aggregate_t rowAggregate_m = aggregate_t_init;
 
     PrecomputationCompute:
-    for (size_t i = m; i < n; ++i) {
+    for (index_t i = m; i < n; ++i) {
         #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
         data_t T_r = T_m[0];
@@ -68,7 +68,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
         // recompute mean to achieve II=1
         mean = 0;
         PrecomputationComputeUpdateMean:
-        for(size_t k = 1; k < m; ++k) {
+        for(index_t k = 1; k < m; ++k) {
             #pragma HLS UNROLL
             mean += T_m[k];
         }
@@ -85,7 +85,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
         qt_sum = 0;
 
         PrecomputationComputeUpdateInvQT:
-        for (size_t k = 1; k < m; k++) {
+        for (index_t k = 1; k < m; k++) {
             #pragma HLS UNROLL
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
@@ -112,7 +112,7 @@ void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data
 
         // shift all values in T_m back
         PrecomputationComputeShift: 
-        for (size_t k = 0; k < m - 1; ++k){
+        for (index_t k = 0; k < m - 1; ++k){
             #pragma HLS UNROLL
             T_m[k] = T_m[k + 1];
         }
@@ -131,7 +131,7 @@ void ReductionComputionElement(aggregate_t (&rowAggregate)[sublen], aggregate_t 
     #pragma HLS INLINE
     // Just always take the max
     ReductionCompute:
-    for (size_t i = 0; i < sublen; ++i) {
+    for (index_t i = 0; i < sublen; ++i) {
         #pragma HLS PIPELINE II=1
         aggregate_t rowAggregate_m = rowAggregate[i], columnAggregate_m = columnAggregate[i];
         // Take the max and compute EuclideanDistance
@@ -159,7 +159,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
     // Do the actual calculations via updates
     MatrixProfileComputeRow:
-    for (size_t row = 1; row < sublen; ++row) {
+    for (index_t row = 1; row < sublen; ++row) {
         data_t dfi = df[row]; data_t dgi = dg[row]; data_t invi = inv[row];
         aggregate_t rowAggregate_m = aggregate_t_init;
 
@@ -169,7 +169,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         //               <==> row + k <= row + m/4
         //               <==> k <= m/4
         MatrixProfileComputeColumn:
-        for (size_t k = (m / 4); k < sublen - row; ++k) {
+        for (index_t k = (m / 4); k < sublen - row; ++k) {
             #pragma HLS PIPELINE II=1
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
@@ -179,7 +179,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
             P[k] = QT[k] * invi * inv[k + row];
 
             // Update Aggregates
-            const size_t column = row + k;
+            const index_t column = row + k;
             if(P[k] > columnAggregate[column].value)
                 columnAggregate[column] = {P[k], static_cast<index_t>(row)};
             if(P[k] > rowAggregate_m.value)

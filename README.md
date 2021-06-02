@@ -31,3 +31,5 @@ export XILINX_VITIS=/mnt
 ```bash
 ./matrix-profile-hls -b mp_binary_container.xclbin -i small8_syn --verbose
 ```
+
+> Data-Set Source: https://github.com/matrix-profile-foundation/mpf-datasets

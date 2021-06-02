@@ -11,15 +11,20 @@ struct Stream1DKernel: public MatrixProfileKernel<data_t, index_t, n, m> {
 
 TEST(TestStream1DKernel, TestSmall8SynM4) {
     Stream1DKernel<double, int, 8, 4> kernel;
-    TestMatrixProfileKernel(kernel, "small8_syn.txt");
+    TestMatrixProfileKernel(kernel, "synthetic/small8_syn.txt");
 }
 
 TEST(TestStream1DKernel, TestSmall16SynM4) {
     Stream1DKernel<double, int, 16, 4> kernel;
-    TestMatrixProfileKernel(kernel, "small16_syn.txt");
+    TestMatrixProfileKernel(kernel, "synthetic/small16_syn.txt");
 }
 
 TEST(TestStream1DKernel, TestSmall128SynM4) {
     Stream1DKernel<double, int, 128, 4> kernel;
-    TestMatrixProfileKernel(kernel, "small128_syn.txt");
+    TestMatrixProfileKernel(kernel, "synthetic/small128_syn.txt");
+}
+
+TEST(TestStream1DKernel, TestBenchmark16384SynM4) {
+    Stream1DKernel<double, int, 1024, 4> kernel;
+    TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
 }

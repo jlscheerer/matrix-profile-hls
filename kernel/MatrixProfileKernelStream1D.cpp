@@ -31,7 +31,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<comput
 
     // TODO: Move mean out to unroll
     data_t mean = 0;
-    for (size_t i = 0; i < m; i++) {
+    for (index_t i = 0; i < m; i++) {
         data_t T_i = T[i];
         mean += T_i;
         T_m[i] = T_i;
@@ -42,7 +42,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<comput
 
     // TODO: Unroll this Loop
     data_t inv_sum = 0, qt_sum = 0;
-    for (size_t k = 0; k < m; k++) {
+    for (index_t k = 0; k < m; k++) {
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
     }
@@ -57,7 +57,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<comput
     columnAggregate.write({aggregate_init, index_init});
 
     data_t prev_mean;
-    for (size_t i = m; i < n; ++i) {
+    for (index_t i = m; i < n; ++i) {
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
@@ -69,7 +69,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<comput
 
         inv_sum = 0; qt_sum = 0;
         // TODO: needs to be unrolled
-        for (size_t k = 1; k < m; k++) {
+        for (index_t k = 1; k < m; k++) {
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
         }
@@ -97,26 +97,26 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<comput
 
         // shift all values in T_m back
         // TODO: Unroll
-        for (size_t k = 0; k < m - 1; k++) {
+        for (index_t k = 0; k < m - 1; k++) {
             T_m[k] = T_m[k + 1];
         }
         T_m[m - 1] = T_i;
     }
 }
 
-const bool ExclusionZone(size_t i, size_t j) {
+const inline bool ExclusionZone(const index_t i, const index_t j) {
     // Exclusion Zone <==> i - m/4 <= j <= i + m/4
     // 				  <==> j <= i + m/4 [i <= j, m > 0]
     return j < i + m / 4;
 }
 
 // TODO: Can optimize exclusionZone either every result will be in the exclusionZone or none
-void MatrixProfileComputationElement(size_t stage, stream<data_t, stream_d> &QT_in,
+void MatrixProfileComputationElement(index_t stage, stream<data_t, stream_d> &QT_in,
         stream<compute_t, stream_d> &compute_i_in, stream<compute_t, stream_d> &compute_j_in,
         stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in,
         stream<data_t, stream_d> &QT_out, stream<compute_t, stream_d> &compute_i_out, stream<compute_t, stream_d> &compute_j_out,
         stream<aggregate_t, stream_d> &rowAggregate_out, stream<aggregate_t, stream_d> &columnAggregate_out) {
-    for (size_t i = 0; i < stage; ++i) {
+    for (index_t i = 0; i < stage; ++i) {
         // forward column aggregate
         aggregate_t columnAggregate = columnAggregate_in.read();
         columnAggregate_out.write(columnAggregate);
@@ -146,7 +146,7 @@ void MatrixProfileComputationElement(size_t stage, stream<data_t, stream_d> &QT_
     compute_t pcompute_i = compute_i;
     data_t pP = P; bool pExclusionZone = exclusionZone;
     aggregate_t pRowAggregate = rowAggregate;
-    for (size_t i = 1; i < n - m + 1 - stage; ++i) {
+    for (index_t i = 1; i < n - m + 1 - stage; ++i) {
         data_t pQT = QT_in.read();
 
         compute_i = compute_i_in.read();
@@ -197,7 +197,7 @@ void MatrixProfileComputationElement(size_t stage, stream<data_t, stream_d> &QT_
     }
 
     // forward row aggregates
-    for (size_t i = 0; i < stage; ++i) {
+    for (index_t i = 0; i < stage; ++i) {
         rowAggregate = rowAggregate_in.read();
         rowAggregate_out.write(rowAggregate);
     }
@@ -209,14 +209,14 @@ data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
 
 void StreamToMemory(stream<aggregate_t, stream_d> &rowAggregate, stream<aggregate_t, stream_d> &columnAggregate, data_t *MP, index_t *MPI) {
     // TODO: Use local cache don't directly write to memory (might be better?) (this way we need to access 3 times!)
-    for (size_t i = 0; i < n - m + 1; ++i){
+    for (index_t i = 0; i < n - m + 1; ++i){
         // TODO: If this remains move to constant
         MP[i] = 1e12; // i.e. "positive infinity"
         MPI[i] = -1;
     }
 
     // Just columns
-    for (size_t i = 0; i < n - m + 1; ++i) {
+    for (index_t i = 0; i < n - m + 1; ++i) {
         aggregate_t aggregate = columnAggregate.read();
         // TODO: Improve this (move out MP?, calculate PearsonCorrelation only once)
         data_t euclideanDistance = PearsonCorrelationToEuclideanDistance(aggregate.value);
@@ -227,7 +227,7 @@ void StreamToMemory(stream<aggregate_t, stream_d> &rowAggregate, stream<aggregat
     }
 
     // Just rows
-    for (size_t i = 0; i < n - m + 1; ++i) {
+    for (index_t i = 0; i < n - m + 1; ++i) {
         aggregate_t aggregate = rowAggregate.read();
         // TODO: Improve this (move out MP?, calculate PearsonCorrelation only once)
         data_t euclideanDistance = PearsonCorrelationToEuclideanDistance(aggregate.value);
@@ -248,7 +248,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     
     #pragma HLS DATAFLOW
 
-    constexpr size_t numStages = n - m + 1;
+    constexpr index_t numStages = n - m + 1;
 
     // Streams for the Scatter Lane (i: rows, j: columns)
     stream<data_t, stream_d> QT[numStages + 1];
@@ -261,7 +261,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
     MemoryToStream(T, QT[0], compute_i[0], compute_j[0], rowAggregate[0], columnAggregate[0]);
 
-    for (size_t stage = 0; stage < numStages; ++stage) {
+    for (index_t stage = 0; stage < numStages; ++stage) {
         #pragma HLS UNROLL
         MatrixProfileComputationElement(stage, QT[stage], compute_i[stage], compute_j[stage], rowAggregate[stage], columnAggregate[stage], 
                 QT[stage + 1], compute_i[stage + 1], compute_j[stage + 1], rowAggregate[stage + 1], columnAggregate[stage + 1]);

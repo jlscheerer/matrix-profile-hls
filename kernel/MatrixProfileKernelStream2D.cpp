@@ -18,12 +18,13 @@ static constexpr size_t stream_d = 3;
 
 // number of tiles in the first row
 // ⌈(n - m + 1) / t⌉ = ⌈sublen / t⌉
-static constexpr size_t nTiles = (sublen + t - 1) / t;
+static constexpr index_t nTiles = (sublen + t - 1) / t;
 
-static constexpr size_t min(const size_t a, const size_t b){ return (a < b) ? a : b; }
+static constexpr index_t min(const index_t a, const index_t b){ return (a < b) ? a : b; }
+static constexpr index_t max(const index_t a, const index_t b){ return (a > b) ? a : b; }
 
 // https://math.stackexchange.com/questions/2134011/conversion-of-upper-triangle-linear-index-from-index-on-symmetrical-array
-static constexpr size_t index2D(const size_t x, const size_t y) { return (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + x; }
+static constexpr index_t index2D(const index_t x, const index_t y) { return (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + x; }
 
 void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t, stream_d> &sMu,
                     stream<data_t, stream_d> &sDf, stream<data_t, stream_d> &sDg, stream<data_t, stream_d> &sInv) {
@@ -34,14 +35,14 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
     // initialize mean calculation and local "cache"
     // read T values cannot be directly passed on (this would cause a deadlock in the ProcessingElements)
     PrecomputationInitT:
-    for (size_t i = 0; i < m; ++i) {
+    for (index_t i = 0; i < m; ++i) {
         #pragma HLS PIPELINE II=1
         T_m[i] = T[i];
     }
 
     data_t mean = 0;
     PrecomputationInitMu:
-    for (size_t i = 0; i < m; ++i){
+    for (index_t i = 0; i < m; ++i){
         #pragma HLS UNROLL
         mean += T_m[i];
     }
@@ -49,7 +50,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
 
     data_t inv_sum = 0;
     PrecomputationInitInv:
-    for (size_t k = 0; k < m; ++k){
+    for (index_t k = 0; k < m; ++k){
         #pragma HLS UNROLL
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
     }
@@ -59,7 +60,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
     sInv.write(1 / sqrt(inv_sum));
 
     PrecomputationCompute:
-    for (size_t i = m; i < n; ++i) {
+    for (index_t i = m; i < n; ++i) {
         #pragma HLS PIPELINE II=1
         data_t Ti = T[i];
         data_t Tm = T_m[0];
@@ -67,7 +68,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
         // recompute mean to achieve II=1
         mean = 0;
         PrecomputationComputeUpdateMean:
-        for(size_t k = 1; k < m; ++k) {
+        for(index_t k = 1; k < m; ++k) {
             #pragma HLS UNROLL
             mean += T_m[k];
         }
@@ -87,7 +88,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
 
         inv_sum = 0;
         PrecomputationComputeUpdateInv:
-        for (size_t k = 1; k < m; ++k){
+        for (index_t k = 1; k < m; ++k){
             #pragma HLS UNROLL
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         }
@@ -97,7 +98,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
 
         // shift all values in T_m back
         PrecomputationComputeShift:
-        for (size_t k = 0; k < m - 1; ++k){
+        for (index_t k = 0; k < m - 1; ++k){
             #pragma HLS UNROLL
             T_m[k] = T_m[k + 1];
         }
@@ -106,13 +107,13 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t
 
     // Push the remaining values
     PrecomputationScatterCacheT:
-    for (size_t i = 0; i < m; ++i) {
+    for (index_t i = 0; i < m; ++i) {
         #pragma HLS PIPELINE II=1
         sT.write(T_m[i]);
     }
 }
 
-void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], data_t (&Tj_m)[t + m - 1], data_t mui_m, data_t (&muj_m)[t], 
+void MatrixProfileComputeUnit(index_t yStage, index_t xStage, data_t (&Ti_m)[m], data_t (&Tj_m)[t + m - 1], data_t mui_m, data_t (&muj_m)[t], 
                               data_t (&dfi_m)[t], data_t (&dfj_m)[2 * t - 1], data_t (&dgi_m)[t], data_t (&dgj_m)[2 * t - 1], data_t (&invi_m)[t], 
                               data_t (&invj_m)[2 * t - 1], aggregate_t (&rowAggregate)[t], aggregate_t (&columnAggregate)[2 * t - 1]) {
     #pragma HLS INLINE
@@ -121,8 +122,8 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
     aggregate_t rowAggregate_m = aggregate_t_init;
     
     // Compute the Matrix Profile (here)
-    const size_t yOffset = yStage * t;
-    const size_t xOffset = xStage * t;
+    const index_t yOffset = yStage * t;
+    const index_t xOffset = xStage * t;
 
     // Exclusion Zone <==> realX - m/4 <= realY <= realX + m/4
     // 				  <==> (xStage * t + r + i) - m/4 <= yStage * t + r <= (xStage * t + r + i) + m/4
@@ -131,15 +132,15 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
     //    			  <==> (xStage - yStage) * t + i - m/4 <= 0
     // 				  <==> (xStage - yStage) * t - m/4 <= -i
     //   			  <==> i <= (yStage - xStage) * t + m/4
-    const size_t exclusionZone = (yStage - xStage) * t + m / 4;
+    const index_t exclusionZone = max((yStage - xStage) * t + m / 4, 0);
 
     // compute the first row of the matrix
     MatrixProfileComputeInitQRow:
-    for (size_t i = exclusionZone; i < min(t, n - m + 1 - t * xStage); ++i) {
+    for (index_t i = exclusionZone; i < min(t, n - m + 1 - t * xStage); ++i) {
         // compute convolution explicitly
         data_t sum = 0;
         MatrixProfileComputeInitQColumn:
-        for (size_t j = 0; j < m; j++) {
+        for (index_t j = 0; j < m; j++) {
             #pragma HLS UNROLL
             sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
         }
@@ -157,10 +158,10 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
     // TODO: Heavily optimize this Loop
     // Compute (t-1) rows using the simplification
     MatrixProfileComputeRow:
-    for (size_t r = 1; r < t; ++r) {
+    for (index_t r = 1; r < t; ++r) {
         rowAggregate_m = aggregate_t_init;
         MatrixProfileComputeColumn:
-        for (size_t i = exclusionZone; i < min(t, n - m - t * xStage - r + 1); ++i) {
+        for (index_t i = exclusionZone; i < min(t, n - m - t * xStage - r + 1); ++i) {
             #pragma HLS PIPELINE II=1
             
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
@@ -173,7 +174,7 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
             if (P[i] > rowAggregate_m.value)
                 rowAggregate_m = {P[i], static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
             
-            const size_t column = r + i;
+            const index_t column = r + i;
             if (P[i] > columnAggregate[column].value)
                 columnAggregate[column] = {P[i], static_cast<index_t>(r + yOffset)}; // remember "best" row for columns
         }
@@ -182,7 +183,7 @@ void MatrixProfileComputeUnit(size_t yStage, size_t xStage, data_t (&Ti_m)[m], d
 
 }
 
-void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d> &sT_in,
+void ScatterLaneStreamingUnit(index_t yStage, index_t xStage, stream<data_t, stream_d> &sT_in,
         stream<data_t, stream_d> &sMu_in, stream<data_t, stream_d> &sDf_in, stream<data_t, stream_d> &sDg_in, stream<data_t, stream_d> &sInv_in,
 
         stream<data_t, stream_d> &Ti_out, stream<data_t, stream_d> &Tj_out, stream<data_t, stream_d> &mui_out, stream<data_t, stream_d> &muj_out,
@@ -214,7 +215,7 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     // =============== [Scatter] ===============
     data_t mu = 0, df = 0, dg = 0, inv = 0;
     ScatterDiagonalLane:
-    for (size_t i = 0; i < n - t * xStage; ++i) {
+    for (index_t i = 0; i < n - t * xStage; ++i) {
         #pragma HLS PIPELINE II=1
         data_t Ti = sT_in.read();
 
@@ -296,23 +297,23 @@ void ScatterLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, strea
     // =============== [Reduce] ===============
     // Don't need to forward anything because we are the first element of the row
     // Just row
-    size_t rowAggregateLength = min(t, n - m + 1 - t * yStage);
+    index_t rowAggregateLength = min(t, n - m + 1 - t * yStage);
     ScatterReduceAggregateRow:
-    for (size_t i = 0; i < rowAggregateLength; ++i) {
+    for (index_t i = 0; i < rowAggregateLength; ++i) {
         #pragma HLS PIPELINE II=1
         rowAggregate_out.write(rowAggregate[i]);
     }
     // Just column
-    size_t columnAggregateLength = min(t + (t - 1), n - m + 1 - t * yStage);
+    index_t columnAggregateLength = min(t + (t - 1), n - m + 1 - t * yStage);
     ScatterReduceAggregateColumn:
-    for (size_t i = 0; i < columnAggregateLength; ++i) {
+    for (index_t i = 0; i < columnAggregateLength; ++i) {
         #pragma HLS PIPELINE II=1
         columnAggregate_out.write(columnAggregate[i]);
     }
     // =============== [/Reduce] ===============
 }
 
-void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d> &Ti_in,
+void RowLaneStreamingUnit(index_t yStage, index_t xStage, stream<data_t, stream_d> &Ti_in,
         stream<data_t, stream_d> &Tj_in, stream<data_t, stream_d> &mui_in, stream<data_t, stream_d> &muj_in, stream<data_t, stream_d> &dfi_in,
         stream<data_t, stream_d> &dfj_in, stream<data_t, stream_d> &dgi_in, stream<data_t, stream_d> &dgj_in, stream<data_t, stream_d> &invi_in,
         stream<data_t, stream_d> &invj_in,
@@ -347,7 +348,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     // TODO: Reformat memory writes
     data_t Ti = 0, mui = 0;
     RowLaneScatterRow:
-    for (size_t i = 0; i < t; ++i) {
+    for (index_t i = 0; i < t; ++i) {
         #pragma HLS PIPELINE II=1
         if (i < m) {
             Ti = Ti_in.read();
@@ -387,7 +388,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     // Column Streaming: Read Values for the current column
     data_t muj = 0, dfj = 0, dgj = 0, invj = 0;
     RowLaneScatterColumn:
-    for (size_t i = 0; i < (n - t * xStage); ++i) {
+    for (index_t i = 0; i < (n - t * xStage); ++i) {
         #pragma HLS PIPELINE II=1
         data_t Tj = Tj_in.read();
 
@@ -435,7 +436,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     // =============== [Reduce] ===============
     // Just rows
     RowLaneReduceRow:
-    for (size_t i = 0; i < t; ++i) {
+    for (index_t i = 0; i < t; ++i) {
         #pragma HLS PIPELINE II=1
         aggregate_t prevRowAggregate = rowAggregate_in.read();
         aggregate_t curRowAggregate  = rowAggregate[i];
@@ -445,7 +446,7 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     // Just columns
     data_t columnAggregateLength = min((xStage - yStage) * t + t - 1 + t, n - m + 1 - t * yStage);
     RowLaneReduceColumn:
-    for (size_t i = 0; i < columnAggregateLength; ++i) {
+    for (index_t i = 0; i < columnAggregateLength; ++i) {
         #pragma HLS PIPELINE II=1
         aggregate_t prevColAggregate = (i < (xStage - yStage) * t + t - 1) ? columnAggregate_in.read() : aggregate_t_init;
         aggregate_t curColAggregate  = (i >= (xStage - yStage) * t) ? columnAggregate[i - (xStage - yStage) * t] : aggregate_t_init;
@@ -454,22 +455,22 @@ void RowLaneStreamingUnit(size_t yStage, size_t xStage, stream<data_t, stream_d>
     // =============== [/Reduce] ===============
 }
 
-void RowReductionUnit(size_t yStage, stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in,
+void RowReductionUnit(index_t yStage, stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in,
                       stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in,
                       stream<aggregate_t, stream_d> &rRow_out, stream<aggregate_t, stream_d> &rCol_out) {
     // forward row aggregates
-    size_t rowAggregateLength = min(t * (yStage + 1), n - m + 1);
+    index_t rowAggregateLength = min(t * (yStage + 1), n - m + 1);
     ReductionReduceRow:
-    for (size_t i = 0; i < rowAggregateLength; ++i) {
+    for (index_t i = 0; i < rowAggregateLength; ++i) {
         #pragma HLS PIPELINE II=1
         rRow_out.write((i < t * yStage) ? rRow_in.read() 
                                         : rowAggregate_in.read());
     }
 
     // forward columns & reduce with previous element in case of contention
-    size_t columnAggregateLength = n - m + 1;
+    index_t columnAggregateLength = n - m + 1;
     ReductionReduceColumn:
-    for (size_t i = 0; i < columnAggregateLength; ++i) {
+    for (index_t i = 0; i < columnAggregateLength; ++i) {
         #pragma HLS PIPELINE II=1
         // Previous Aggregates
         aggregate_t prevColAggregate = yStage > 0 ? rCol_in.read() 
@@ -493,7 +494,7 @@ void StreamToMemory(stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, 
 
     // read the row-wise aggregates from reduction-lane
     StreamToMemoryReduceRows:
-    for (size_t i = 0; i < n - m + 1; ++i) {
+    for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPLEINE II=1
         aggregates_m[i] = rRow_in.read();
     }
@@ -501,7 +502,7 @@ void StreamToMemory(stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, 
     // read the column-wise aggregates from reduction-lane, reduce them with
     // row-wise aggregates and calculate PearsonCorrelation
     StreamToMemoryReduceColumns:
-    for (size_t i = 0; i < n - m + 1; ++i) {
+    for (index_t i = 0; i < n - m + 1; ++i) {
         aggregate_t rowAggregate = aggregates_m[i];
         aggregate_t columnAggregate = rCol_in.read();
         MP[i] = PearsonCorrelationToEuclideanDistance(rowAggregate.value > columnAggregate.value ? rowAggregate.value : columnAggregate.value);
@@ -519,7 +520,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     
     #pragma HLS DATAFLOW
 
-    constexpr size_t nStreams = ((nTiles + 1) * nTiles) / 2;
+    constexpr index_t nStreams = ((nTiles + 1) * nTiles) / 2;
 
     // Streams for the Scatter Lane
     stream<data_t, stream_d> sT[nTiles + 1], sMu[nTiles + 1], sDf[nTiles + 1], sDg[nTiles + 1], sInv[nTiles + 1];
@@ -537,7 +538,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     MemoryToStream(T, sT[0], sMu[0], sDf[0], sDg[0], sInv[0]);
 
     // TODO: Potentially Flatten this Loop
-    for (size_t y = 0; y < nTiles; ++y) {
+    for (index_t y = 0; y < nTiles; ++y) {
         #pragma HLS UNROLL
         const index_t beginIndex = index2D(y, y);
         ScatterLaneStreamingUnit(y, y, sT[y], sMu[y], sDf[y], sDg[y], sInv[y], Ti[beginIndex], Tj[beginIndex],
@@ -545,7 +546,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
                 dgj[beginIndex], invi[beginIndex], invj[beginIndex], rowAggregate[beginIndex], columnAggregate[beginIndex],
                 sT[y + 1], sMu[y + 1], sDf[y + 1], sDg[y + 1], sInv[y + 1]);
 
-        for (size_t x = y + 1; x < nTiles; ++x) {
+        for (index_t x = y + 1; x < nTiles; ++x) {
             #pragma HLS UNROLL
             index_t index = index2D(x, y);
             RowLaneStreamingUnit(y, x, Ti[index - 1], Tj[index - 1], mui[index - 1], muj[index - 1],
