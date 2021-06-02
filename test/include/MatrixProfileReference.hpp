@@ -9,17 +9,17 @@ namespace Reference {
 
     namespace Internal {
 
-        template<typename index_t>
-        constexpr index_t IndexInit();
-
-        template<>
-        constexpr int IndexInit() { return -1; }
-
         template<typename data_t>
         constexpr data_t AggregateInit();
 
         template<>
         constexpr double AggregateInit() { return -1e12; }
+
+        template<typename index_t>
+        constexpr index_t IndexInit();
+
+        template<>
+        constexpr int IndexInit() { return -1; }
 
         template<typename data_t, size_t n, size_t m>
         std::array<data_t, n - m + 1> MovMean(const std::array<data_t, n> &T) {
@@ -69,7 +69,7 @@ namespace Reference {
             //               <==> column <= row + m/4 [(row <= column, m > 0) ==> row - m/4 <= column]
             //               <==> row + (column - row) <= row + m/4
             //               <==> (column - row) <= m/4
-            return (column - row) <= m/4;
+            return (column - row) < m/4;
         }
 
         template<typename data_t, typename index_t, size_t n, size_t m>

@@ -8,6 +8,8 @@
 
 #include <cstdlib>
 
+#include "Initialize.hpp"
+
 // type alias for time series & resulting matrix profile
 using data_t = double;
 
@@ -30,10 +32,10 @@ static constexpr index_t sublen = n - m + 1;
 // TODO: Determine Init Values using Templated Function Automatically
 
 // "negative infinity" used to initialize aggregates
-static constexpr data_t aggregate_init = ${MP_AGGREGATE_INIT};
+static constexpr data_t aggregate_init = AggregateInit<data_t>();
 
 // used to indicate an invalid/undetermined index
-static constexpr index_t index_init = ${MP_INDEX_INIT};
+static constexpr index_t index_init = IndexInit<index_t>();
 
 // "translate" the selected kernel implementation (type) to a readable string
 #define KERNEL_IMPL_NAME "v${MP_KERNEL}"
