@@ -9,10 +9,10 @@
 #include <cstdlib>
 
 // type alias for time series & resulting matrix profile
-using data_t = double;
+using data_t = ${MP_DATA_TYPE};
 
 // type alias for the resulting matrix profile index
-using index_t = int;
+using index_t = ${MP_INDEX_TYPE};
 
 // length of the time series data
 static constexpr index_t n = ${MP_SIZE_N};
