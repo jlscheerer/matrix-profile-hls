@@ -8,8 +8,6 @@
 
 #include <cstdlib>
 
-#include "Initialize.hpp"
-
 // type alias for time series & resulting matrix profile
 using data_t = double;
 
@@ -28,6 +26,22 @@ static constexpr index_t t = ${MP_SIZE_T};
 
 // length of the resulting matrix profile (index)
 static constexpr index_t sublen = n - m + 1;
+
+namespace MatrixProfileConfig {
+    
+    template<typename T>
+    constexpr T AggregateInit();
+
+    template<>
+    constexpr double AggregateInit() { return -1e12; }
+
+    template<typename T>
+    constexpr T IndexInit();
+
+    template<>
+    constexpr int IndexInit() { return -1; }
+
+}
 
 // "negative infinity" used to initialize aggregates
 static constexpr data_t aggregate_init = MatrixProfileConfig::AggregateInit<data_t>();
