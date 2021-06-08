@@ -13,12 +13,20 @@ set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream2D) [assumpti
 
 set(MP_KERNEL "Stream2D" CACHE STRING "implementation to use for the matrix profile kernel {Streamless, Stream1D, Stream2D}")
 
+set(MP_TARGET "hw_emu" CACHE STRING "compile target: {sw_emu, hw_emu, hw}")
+
 # Custom option to enable software testing using google-test
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
 option(BUILD_TESTS "Build software tests (google-test)" OFF)
 
 # Create the configuration file
 configure_file(include/Config.hpp.in Config.hpp)
+
+# Configer v++ configuration files
+configure_file(config/common-config.cfg.in config/common-config.cfg)
+configure_file(config/compile-config.cfg.in config/compile-config.cfg)
+configure_file(config/link-config.cfg.in config/link-config.cfg)
+configure_file(config/package-config.cfg.in config/package-config.cfg)
 
 # TODO: Check validity of parameters!
 
@@ -50,26 +58,26 @@ set(KERNEL_COMPILE_COMMAND
     --compile 
     -I"${CMAKE_CURRENT_BINARY_DIR}"
     -I"${CMAKE_CURRENT_SOURCE_DIR}/kernel"
-    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/common-config.cfg"
-    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/compile-config.cfg"
+    --config "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
+    --config "${CMAKE_CURRENT_BINARY_DIR}/config/compile-config.cfg"
     -I"${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 set(KERNEL_LINK_COMMAND
     --link
-    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/common-config.cfg"
-    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/link-config.cfg")
+    --config "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
+    --config "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 
-add_custom_target(compile COMMAND ${VITIS_COMPILER} --target hw_emu ${KERNEL_COMPILE_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp")
+add_custom_target(compile COMMAND ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_COMPILE_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp")
 
-add_custom_target(link COMMAND ${VITIS_COMPILER} --target hw_emu ${KERNEL_LINK_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo")
+add_custom_target(link COMMAND ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo")
 
 # Package SD-Card
 set(PACKAGE_COMMAND
     --package
-    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/package-config.cfg"
+    --config "${CMAKE_CURRENT_BINARY_DIR}/config/package-config.cfg"
     --package.sd_dir "${CMAKE_CURRENT_SOURCE_DIR}/data")
 
-add_custom_target(package_sd COMMAND ${VITIS_COMPILER} --target hw_emu ${PACKAGE_COMMAND} "${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin")
+add_custom_target(package_sd COMMAND ${VITIS_COMPILER} --target ${MP_TARGET} ${PACKAGE_COMMAND} "${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin")
 
 # Software Testing
 if (BUILD_TESTS)
