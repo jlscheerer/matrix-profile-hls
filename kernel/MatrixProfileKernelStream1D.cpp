@@ -31,6 +31,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
     data_t Ti_m[m];
 
     // move out mean pipeline & unroll
+    PrecomputationInitT:
     for (index_t i = 0; i < m; i++) {
         data_t T_i = T[i];
         mean += T_i;
@@ -44,6 +45,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
     data_t mu0 = mean;
 
     // TODO: Unroll this Loop
+    PrecomputationInitInvQT:
     for (index_t k = 0; k < m; k++) {
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
@@ -59,6 +61,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
     rowAggregate.write(aggregate_t_init);
 
     data_t prev_mean = 0;
+    PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
         data_t T_i = T[i];
         data_t T_r = T_m[0];
@@ -72,6 +75,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
         inv_sum = 0;
         qt_sum = 0;
         // TODO: needs to be unrolled
+        PrecomputationComputeUpdateInvQT:
         for (index_t k = 1; k < m; k++) {
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
@@ -105,6 +109,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
 
         // shift all values in T_m back
         // TODO: Unroll
+        PrecomputationComputeShift:
         for (index_t k = 0; k < m - 1; k++) {
             T_m[k] = T_m[k + 1];
         }
@@ -117,6 +122,7 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
                                      stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in, stream<data_t, stream_d> &QT_out,
                                      stream<data_t, stream_d> &df_i_out, stream<data_t, stream_d> &df_j_out, stream<data_t, stream_d> &dg_i_out, stream<data_t, stream_d> &dg_j_out,
                                      stream<data_t, stream_d> &inv_i_out, stream<data_t, stream_d> &inv_j_out, stream<aggregate_t, stream_d> &rowAggregate_out, stream<aggregate_t, stream_d> &columnAggregate_out) {
+    MatrixProfileForwardColumnAggregate:
     for (index_t i = 0; i < stage; ++i) {
         // forward column aggregate
         columnAggregate_out.write(columnAggregate_in.read());
@@ -163,6 +169,7 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
     }
 
     // n - m + 1 - stage - 1 because first element was taken care outside the loop
+    MatrixProfileCompute:
     for (index_t i = 0; i < n - m - stage; ++i) {
         data_t QT_forward = QT_in.read();
 
@@ -226,6 +233,7 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
 
     }
 
+    MatrixProfileForwardRowAggregate:
     for (index_t i = 0; i < stage; ++i) {
         // forward row aggregate
         rowAggregate_out.write(rowAggregate_in.read());
@@ -241,11 +249,13 @@ void StreamToMemory(stream<aggregate_t, stream_d> &rowAggregate, stream<aggregat
     aggregate_t aggregates_m[n - m + 1];
 
     // read column-wise aggregates and cache
+    StreamToMemoryReduceColumns:
     for (index_t i = 0; i < n - m + 1; ++i) {
         aggregates_m[i] = columnAggregate.read();
     }
 
     // read row-wise aggreagtes and merge
+    StreamToMemoryReduceRows:
     for (index_t i = 0; i < n - m + 1; ++i) {
         aggregate_t rAggregate = rowAggregate.read();
         aggregate_t cAggregate = aggregates_m[i];
