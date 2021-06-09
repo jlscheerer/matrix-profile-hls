@@ -14,7 +14,7 @@
     using hls::stream;
 #endif
 
-static constexpr size_t stream_d = 2;
+static constexpr size_t stream_d = 3;
 
 void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t, stream_d> &df_i, stream<data_t, stream_d> &df_j,
                     stream<data_t, stream_d> &dg_i, stream<data_t, stream_d> &dg_j, stream<data_t, stream_d> &inv_i,
@@ -112,7 +112,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
     }
 }
 
-void MatrixProfileComputationElement(index_t stage, stream<data_t, stream_d> &QT_in, stream<data_t, stream_d> &df_i_in, stream<data_t, stream_d> &df_j_in, 
+void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_d> &QT_in, stream<data_t, stream_d> &df_i_in, stream<data_t, stream_d> &df_j_in, 
                                      stream<data_t, stream_d> &dg_i_in, stream<data_t, stream_d> &dg_j_in, stream<data_t, stream_d> &inv_i_in, stream<data_t, stream_d> &inv_j_in, 
                                      stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in, stream<data_t, stream_d> &QT_out,
                                      stream<data_t, stream_d> &df_i_out, stream<data_t, stream_d> &df_j_out, stream<data_t, stream_d> &dg_i_out, stream<data_t, stream_d> &dg_j_out,
@@ -163,7 +163,7 @@ void MatrixProfileComputationElement(index_t stage, stream<data_t, stream_d> &QT
     }
 
     // n - m + 1 - stage - 1 because first element was taken care outside the loop
-    for (index_t i = 1; i < n - m + 1 - stage; ++i) {
+    for (index_t i = 0; i < n - m - stage; ++i) {
         data_t QT_forward = QT_in.read();
 
         // read values concerning the current row
@@ -192,7 +192,7 @@ void MatrixProfileComputationElement(index_t stage, stream<data_t, stream_d> &QT
         if (!exclusionZone && PearsonCorrelation >= columnAggregate.value) {
             // use our value
             // remember "best" row for columns
-            columnAggregate_out.write({PearsonCorrelation, i});
+            columnAggregate_out.write({PearsonCorrelation, i + 1});
         } else {
             // pass on previous aggregate
             columnAggregate_out.write(columnAggregate);
@@ -202,14 +202,14 @@ void MatrixProfileComputationElement(index_t stage, stream<data_t, stream_d> &QT
         if (!exclusionZone && PearsonCorrelation >= rowAggregate.value) {
             // use our value
             // remember "best" column for rows
-            rowAggregate_out.write({PearsonCorrelation, i + stage});
+            rowAggregate_out.write({PearsonCorrelation, i + 1 + stage});
         } else {
             // pass on previous aggregate
             rowAggregate_out.write(rowAggregate);
         }
 
         // Move elements along
-        if (i != (n - m + 1) - 1 - stage) {
+        if (i != (n - m) - stage - 1) {
             // pass on everything but the last element
             df_i_out.write(df_i);
             dg_i_out.write(dg_i);
@@ -218,7 +218,7 @@ void MatrixProfileComputationElement(index_t stage, stream<data_t, stream_d> &QT
 
         inv_j_out.write(inv_j);
 
-        if (i != 1) {
+        if (i != 0) {
             // pass on everything but the first element
             df_j_out.write(df_j);
             dg_j_out.write(dg_j);
@@ -255,6 +255,15 @@ void StreamToMemory(stream<aggregate_t, stream_d> &rowAggregate, stream<aggregat
 }
 
 void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
+    #pragma HLS INTERFACE m_axi     port=T   offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi     port=MP  offset=slave bundle=gmem1
+    #pragma HLS INTERFACE m_axi     port=MPI offset=slave bundle=gmem2
+    #pragma HLS INTERFACE s_axilite port=T   bundle=control
+    #pragma HLS INTERFACE s_axilite port=MP  bundle=control
+    #pragma HLS INTERFACE s_axilite port=MPI bundle=control
+
+    #pragma HLS DATAFLOW
+
     constexpr index_t numStages = n - m + 1;
 
     // Streams required to calculate Correlations
@@ -275,6 +284,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     MemoryToStream(T, QT[0], df_i[0], df_j[0], dg_i[0], dg_j[0], inv_i[0], inv_j[0], rowAggregate[0], columnAggregate[0]);
 
     for (index_t stage = 0; stage < numStages; ++stage) {
+        #pragma HLS UNROLL
         MatrixProfileComputationElement(stage, QT[stage], df_i[stage], df_j[stage], dg_i[stage], dg_j[stage],
                                         inv_i[stage], inv_j[stage], rowAggregate[stage], columnAggregate[stage], QT[stage + 1],
                                         df_i[stage + 1], df_j[stage + 1], dg_i[stage + 1], dg_j[stage + 1], inv_i[stage + 1],
