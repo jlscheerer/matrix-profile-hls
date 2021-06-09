@@ -118,6 +118,13 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
                                      stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in, stream<data_t, stream_d> &QT_out,
                                      stream<data_t, stream_d> &df_i_out, stream<data_t, stream_d> &df_j_out, stream<data_t, stream_d> &dg_i_out, stream<data_t, stream_d> &dg_j_out,
                                      stream<data_t, stream_d> &inv_i_out, stream<data_t, stream_d> &inv_j_out, stream<aggregate_t, stream_d> &rowAggregate_out, stream<aggregate_t, stream_d> &columnAggregate_out) {
+    // Check If ProcessingElement is within the ExclusionZone
+    // Exclusion Zone <==> i - m/4 <= j <= i + m/4
+    // 				  <==> j <= i + m/4 [i <= j, m > 0]
+    // 				  <==> (j - i) <= m / 4
+    //				  <==> stage <= m/4
+    const bool exclusionZone = stage < m/4;
+    
     MatrixProfileForwardColumnAggregate:
     for (index_t i = 0; i < stage; ++i) {
         #pragma HLS PIPELINE II=1
@@ -138,32 +145,14 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
     aggregate_t rowAggregate = rowAggregate_in.read();
 
     data_t PearsonCorrelation = QT * inv_i * inv_j;
-    
-    // Check If ProcessingElement is within the ExclusionZone
-    // Exclusion Zone <==> i - m/4 <= j <= i + m/4
-    // 				  <==> j <= i + m/4 [i <= j, m > 0]
-    // 				  <==> (j - i) <= m / 4
-    //				  <==> stage <= m/4
-    bool exclusionZone = stage < m/4;
 
     // pass on the column aggregate
-    if (!exclusionZone && PearsonCorrelation >= columnAggregate.value) {
-        // use our value
-        // remember "best" row for columns
-        columnAggregate_out.write({PearsonCorrelation, 0});
-    } else {
-        // pass on previous aggregate
-        columnAggregate_out.write(columnAggregate);
-    }
+    columnAggregate_out.write((!exclusionZone && PearsonCorrelation >= columnAggregate.value) ? (aggregate_t) {PearsonCorrelation, 0}
+                                                                                              : columnAggregate);
 
     // pass on the row aggregate
-    if (!exclusionZone && PearsonCorrelation >= rowAggregate.value) {
-        // use our value
-        rowAggregate_out.write({PearsonCorrelation, stage});
-    } else {
-        // pass on previous aggregate
-        rowAggregate_out.write(rowAggregate);
-    }
+    rowAggregate_out.write((!exclusionZone && PearsonCorrelation >= rowAggregate.value) ? (aggregate_t) {PearsonCorrelation, stage}
+                                                                                        : rowAggregate);
 
     // n - m + 1 - stage - 1 because first element was taken care outside the loop
     MatrixProfileCompute:
@@ -193,24 +182,12 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
         PearsonCorrelation = QT * inv_i * inv_j;
 
         // pass on the column aggregate
-        if (!exclusionZone && PearsonCorrelation >= columnAggregate.value) {
-            // use our value
-            // remember "best" row for columns
-            columnAggregate_out.write({PearsonCorrelation, i + 1});
-        } else {
-            // pass on previous aggregate
-            columnAggregate_out.write(columnAggregate);
-        }
+        columnAggregate_out.write((!exclusionZone && PearsonCorrelation >= columnAggregate.value) ? (aggregate_t) {PearsonCorrelation, i + 1}
+                                                                                                  : columnAggregate);
 
         // pass on the row aggregate
-        if (!exclusionZone && PearsonCorrelation >= rowAggregate.value) {
-            // use our value
-            // remember "best" column for rows
-            rowAggregate_out.write({PearsonCorrelation, i + 1 + stage});
-        } else {
-            // pass on previous aggregate
-            rowAggregate_out.write(rowAggregate);
-        }
+        rowAggregate_out.write((!exclusionZone && PearsonCorrelation >= rowAggregate.value) ? (aggregate_t) {PearsonCorrelation, i + 1 + stage}
+                                                                                             : rowAggregate);
 
         // Move elements along
         if (i != (n - m) - stage - 1) {
