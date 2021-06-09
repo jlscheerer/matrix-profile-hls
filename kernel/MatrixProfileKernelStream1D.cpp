@@ -63,6 +63,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
 
     PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
+        #pragma HLS PIPELINE II=1
         data_t Ti = T[i];
         data_t Tm = T_m[0];
 
@@ -119,6 +120,7 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
                                      stream<data_t, stream_d> &inv_i_out, stream<data_t, stream_d> &inv_j_out, stream<aggregate_t, stream_d> &rowAggregate_out, stream<aggregate_t, stream_d> &columnAggregate_out) {
     MatrixProfileForwardColumnAggregate:
     for (index_t i = 0; i < stage; ++i) {
+        #pragma HLS PIPELINE II=1
         // forward column aggregate
         columnAggregate_out.write(columnAggregate_in.read());
     }
@@ -230,12 +232,14 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
 
     MatrixProfileForwardRowAggregate:
     for (index_t i = 0; i < stage; ++i) {
+        #pragma HLS PIPELINE II=1
         // forward row aggregate
         rowAggregate_out.write(rowAggregate_in.read());
     }
 }
 
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
+    #pragma HLS INLINE
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
@@ -246,12 +250,14 @@ void StreamToMemory(stream<aggregate_t, stream_d> &rowAggregate, stream<aggregat
     // read column-wise aggregates and cache
     StreamToMemoryReduceColumns:
     for (index_t i = 0; i < n - m + 1; ++i) {
+        #pragma HLS PIPELINE II=1
         aggregates_m[i] = columnAggregate.read();
     }
 
     // read row-wise aggreagtes and merge
     StreamToMemoryReduceRows:
     for (index_t i = 0; i < n - m + 1; ++i) {
+        #pragma HLS PIPELINE II=1
         aggregate_t rAggregate = rowAggregate.read();
         aggregate_t cAggregate = aggregates_m[i];
         MP[i] = PearsonCorrelationToEuclideanDistance(rAggregate.value > cAggregate.value ? rAggregate.value : cAggregate.value);
