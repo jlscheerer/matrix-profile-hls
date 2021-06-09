@@ -35,7 +35,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
         #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
         T_m[i] = T_i;
-        Ti_m[i] = T_I;
+        Ti_m[i] = T_i;
     }
 
     data_t mean = 0;
