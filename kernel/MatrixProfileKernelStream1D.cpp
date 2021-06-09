@@ -19,101 +19,96 @@ static constexpr size_t stream_d = 3;
 void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t, stream_d> &df_i, stream<data_t, stream_d> &df_j,
                     stream<data_t, stream_d> &dg_i, stream<data_t, stream_d> &dg_j, stream<data_t, stream_d> &inv_i,
                     stream<data_t, stream_d> &inv_j, stream<aggregate_t, stream_d> &rowAggregate, stream<aggregate_t, stream_d> &columnAggregate) {
-    data_t mean = 0;
+    // store the previous (m-1) T-values in local "cache" (acts as shift-register)
+    data_t T_m[m];
+    #pragma HLS ARRAY_PARITION variable=T_m complete
+
+    // store the first m T values in local "cache" (required for convolution)
+    data_t Ti_m[m];
+    #pragma HLS ARRAY_PARITION variable=Ti_m complete
+
     data_t inv_sum = 0;
     data_t qt_sum = 0;
 
-    // use T_m as shift register containing the previous m T elements
-    // need to be able to access these elements with no contention
-    data_t T_m[m];
-
-    // the first m T values, required for convolution
-    data_t Ti_m[m];
-
-    // move out mean pipeline & unroll
     PrecomputationInitT:
-    for (index_t i = 0; i < m; i++) {
+    for (index_t i = 0; i < m; ++i) {
+        #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
-        mean += T_i;
         T_m[i] = T_i;
-        Ti_m[i] = T_i;
+        Ti_m[i] = T_I;
+    }
+
+    data_t mean = 0;
+    PrecomputationInitMu:
+    for (index_t i = 0; i < m; ++i) {
+        #pragma HLS UNROLL
+        mean += T_m[i];
     }
     mean /= m;
-
-    // Prepare for the first values (QT, inv, Aggregates)
-    // Calculate initial values
     data_t mu0 = mean;
 
-    // TODO: Unroll this Loop
     PrecomputationInitInvQT:
-    for (index_t k = 0; k < m; k++) {
+    for (index_t k = 0; k < m; ++k) {
+        #pragma HLS UNROLL
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
     }
     data_t inv = 1 / sqrt(inv_sum);
 
     QT.write(qt_sum);
-
-    inv_i.write(inv);
-    inv_j.write(inv);
+    inv_i.write(inv); inv_j.write(inv);
 
     columnAggregate.write(aggregate_t_init);
     rowAggregate.write(aggregate_t_init);
 
-    data_t prev_mean = 0;
     PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
-        data_t T_i = T[i];
-        data_t T_r = T_m[0];
+        data_t Ti = T[i];
+        data_t Tm = T_m[0];
 
-        // TODO: recompute mean to achieve II=1
-        // set and update mean
-        prev_mean = mean;
-        mean = mean + (T_i - T_r) / m;
-        // mu[i - m + 1] = mean;
+        // recompute mean to achieve II=1
+        mean = 0;
+        PrecomputationComputeUpdateMean:
+        for(index_t k = 1; k < m; ++k) {
+            #pragma HLS UNROLL
+            mean += T_m[k];
+        }
+        data_t prev_mean = mean;
+        prev_mean += Tm; prev_mean /= m;
+        mean += Ti; mean /= m;
 
-        inv_sum = 0;
-        qt_sum = 0;
-        // TODO: needs to be unrolled
+        inv_sum = 0; qt_sum = 0;
         PrecomputationComputeUpdateInvQT:
         for (index_t k = 1; k < m; k++) {
+            #pragma HLS UNROLL
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
         }
-        // perform last element of the loop separately (this requires the newly read value)
-        qt_sum += (T_i - mean) * (Ti_m[m - 1] - mu0);
+        qt_sum += (Ti - mean) * (Ti_m[m - 1] - mu0);
+        inv_sum += (Ti - mean) * (Ti - mean);
+        inv = 1 / sqrt(inv_sum);
 
         // calculate df: (T[i+m-1] - T[i-1]) / 2
-        // df[i - m + 1] = (T_i - T_r) / 2;
-        data_t df = (T_i - T_r) / 2;
+        data_t df = (Ti - Tm) / 2;
 
         // calculate dg: (T[i+m-1] - μ[i]) * (T[i-1] - μ[i-1])
-        // dg[i - m + 1] = (T_i - mean) + (T_r - prev_mean);
-        data_t dg = (T_i - mean) + (T_r - prev_mean);
-
-        inv_sum += (T_i - mean) * (T_i - mean);
-        inv = 1 / sqrt(inv_sum);
+        data_t dg = (Ti - mean) + (Tm - prev_mean);
 
         QT.write(qt_sum);
 
-        df_i.write(df);
-        dg_i.write(dg);
-        inv_i.write(inv);
-
-        df_j.write(df);
-        dg_j.write(dg);
-        inv_j.write(inv);
+        df_i.write(df); dg_i.write(dg); inv_i.write(inv);
+        df_j.write(df); dg_j.write(dg); inv_j.write(inv);
 
         columnAggregate.write(aggregate_t_init);
         rowAggregate.write(aggregate_t_init);
 
         // shift all values in T_m back
-        // TODO: Unroll
         PrecomputationComputeShift:
         for (index_t k = 0; k < m - 1; k++) {
+            #pragma HLS UNROLL
             T_m[k] = T_m[k + 1];
         }
-        T_m[m - 1] = T_i;
+        T_m[m - 1] = Ti;
     }
 }
 
