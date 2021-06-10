@@ -56,10 +56,8 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
     data_t inv = 1 / sqrt(inv_sum);
 
     QT.write(qt_sum);
-    inv_i.write(inv); inv_j.write(inv);
-
-    columnAggregate.write(aggregate_t_init);
-    rowAggregate.write(aggregate_t_init);
+    df_i.write(0); dg_i.write(0); inv_i.write(inv);
+    df_j.write(0); dg_j.write(0); inv_j.write(inv);
 
     PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
@@ -80,7 +78,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
 
         inv_sum = 0; qt_sum = 0;
         PrecomputationComputeUpdateInvQT:
-        for (index_t k = 1; k < m; k++) {
+        for (index_t k = 1; k < m; ++k) {
             #pragma HLS UNROLL
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
@@ -96,21 +94,25 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
         data_t dg = (Ti - mean) + (Tm - prev_mean);
 
         QT.write(qt_sum);
-
         df_i.write(df); dg_i.write(dg); inv_i.write(inv);
         df_j.write(df); dg_j.write(dg); inv_j.write(inv);
 
-        columnAggregate.write(aggregate_t_init);
-        rowAggregate.write(aggregate_t_init);
-
         // shift all values in T_m back
         PrecomputationComputeShift:
-        for (index_t k = 0; k < m - 1; k++) {
+        for (index_t k = 0; k < m - 1; ++k) {
             #pragma HLS UNROLL
             T_m[k] = T_m[k + 1];
         }
         T_m[m - 1] = Ti;
     }
+
+    // =============== [Reduce] ===============
+    PrecomputationInitReduce:
+    for (index_t i = 0; i < n - m + 1; ++i) {
+        columnAggregate.write(aggregate_t_init);
+        rowAggregate.write(aggregate_t_init);
+    }
+    // =============== [/Reduce] ===============
 }
 
 void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_d> &QT_in, stream<data_t, stream_d> &df_i_in, stream<data_t, stream_d> &df_j_in, 
@@ -118,101 +120,78 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
                                      stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in, stream<data_t, stream_d> &QT_out,
                                      stream<data_t, stream_d> &df_i_out, stream<data_t, stream_d> &df_j_out, stream<data_t, stream_d> &dg_i_out, stream<data_t, stream_d> &dg_j_out,
                                      stream<data_t, stream_d> &inv_i_out, stream<data_t, stream_d> &inv_j_out, stream<aggregate_t, stream_d> &rowAggregate_out, stream<aggregate_t, stream_d> &columnAggregate_out) {
-    // Check If ProcessingElement is within the ExclusionZone
+    // TODO: Rename df_i_in to dfi_in to be more consistent with Stream2D
+
+    // local "cache" [size: (n - m + 1 - stage) would be sufficient]
+    data_t dfi_m[n - m + 1], dgi_m[n - m + 1], invi_m[n - m + 1];
+    data_t dfj_m[n - m + 1], dgj_m[n - m + 1], invj_m[n - m + 1];
+
+    aggregate_t columnAggregate_m[n - m + 1], rowAggregate_m[n - m + 1];
+
+    data_t QT = 0, PearsonCorrelation = 0;
+
+    // =============== [Scatter] ===============
+    MatrixProfileScatter:
+    for (index_t k = 0; k < n - m + 1 - stage; ++k) {
+        data_t QTforward = QT_in.read();
+        data_t dfi = df_i_in.read(), dgi = dg_i_in.read(), invi = inv_i_in.read();
+        data_t dfj = df_j_in.read(), dgj = dg_j_in.read(), invj = inv_j_in.read();
+
+        // store values in local "cache"
+        QT = (k == 0) ? QTforward : QT;
+        dfi_m[k] = dfi; dgi_m[k] = dgi; invi_m[k] = invi;
+        dfj_m[k] = dfj; dgj_m[k] = dgj; invj_m[k] = invj;
+
+        // forward values to subsequent processing elements
+        if (k != 0)
+            QT_out.write(QTforward);
+
+        if (k != n - m - stage) {
+            // forward everything but the last element for the row
+            df_i_out.write(dfi); dg_i_out.write(dgi); inv_i_out.write(invi);
+        }
+
+        if (k != 0) {
+            // forward everything but the first element for the columns
+            df_j_out.write(dfj); dg_j_out.write(dgj); inv_j_out.write(invj);
+        }
+    }
+    // =============== [/Scatter] ===============
+
+    // =============== [Compute] ===============
+    // check if processing element is within the exclusion zone
     // Exclusion Zone <==> i - m/4 <= j <= i + m/4
     // 				  <==> j <= i + m/4 [i <= j, m > 0]
     // 				  <==> (j - i) <= m / 4
     //				  <==> stage <= m/4
     const bool exclusionZone = stage < m/4;
-    
-    MatrixProfileForwardColumnAggregate:
-    for (index_t i = 0; i < stage; ++i) {
-        #pragma HLS PIPELINE II=1
-        // forward column aggregate
-        columnAggregate_out.write(columnAggregate_in.read());
-    }
-
-    // take care of the first iteration
-    data_t QT = QT_in.read();
-    data_t inv_i = inv_i_in.read();
-    data_t inv_j = inv_j_in.read();
-
-    // forward the inv value (row) (if we are not the last element)
-    if (stage != n - m)
-        inv_i_out.write(inv_i);
-
-    aggregate_t columnAggregate = columnAggregate_in.read();
-    aggregate_t rowAggregate = rowAggregate_in.read();
-
-    data_t PearsonCorrelation = QT * inv_i * inv_j;
-
-    // pass on the column aggregate
-    columnAggregate_out.write((!exclusionZone && PearsonCorrelation >= columnAggregate.value) ? (aggregate_t) {PearsonCorrelation, 0}
-                                                                                              : columnAggregate);
-
-    // pass on the row aggregate
-    rowAggregate_out.write((!exclusionZone && PearsonCorrelation >= rowAggregate.value) ? (aggregate_t) {PearsonCorrelation, stage}
-                                                                                        : rowAggregate);
-
-    // n - m + 1 - stage - 1 because first element was taken care outside the loop
     MatrixProfileCompute:
-    for (index_t i = 0; i < n - m - stage; ++i) {
-        data_t QT_forward = QT_in.read();
+    for (index_t k = 0; k < n - m + 1 - stage; ++k) {
+        data_t dfi = dfi_m[k], dgi = dgi_m[k], invi = invi_m[k];
+        data_t dfj = dfj_m[k], dgj = dgj_m[k], invj = invj_m[k];
 
-        // read values concerning the current row
-        data_t df_i = df_i_in.read();
-        data_t dg_i = dg_i_in.read();
-        inv_i = inv_i_in.read();
+        QT = QT + dfi * dgj + dfj * dgi;
+        PearsonCorrelation = QT * invi * invj;
 
-        // read values concerining the current column
-        data_t df_j = df_j_in.read();
-        data_t dg_j = dg_j_in.read();
-        inv_j = inv_j_in.read();
-
-        rowAggregate = rowAggregate_in.read();
-        columnAggregate = columnAggregate_in.read();
-
-        // forward initial values for QT
-        QT_out.write(QT_forward);
-
-        // Calculate new values of QT: QT_{i, j} = QT_{i-1, j-1} - df_{i} * dg_{j} + df_{j} * dg_{i}
-        QT = QT + df_i * dg_j + df_j * dg_i;
-
-        // Calculate Pearson Correlation: QT * (1 / (||T_{i, m} - μ[i]||)) * (1 / (||T_{j, m} - μ[j]||))
-        PearsonCorrelation = QT * inv_i * inv_j;
-
-        // pass on the column aggregate
-        columnAggregate_out.write((!exclusionZone && PearsonCorrelation >= columnAggregate.value) ? (aggregate_t) {PearsonCorrelation, i + 1}
-                                                                                                  : columnAggregate);
-
-        // pass on the row aggregate
-        rowAggregate_out.write((!exclusionZone && PearsonCorrelation >= rowAggregate.value) ? (aggregate_t) {PearsonCorrelation, i + 1 + stage}
-                                                                                             : rowAggregate);
-
-        // Move elements along
-        if (i != (n - m) - stage - 1) {
-            // pass on everything but the last element
-            df_i_out.write(df_i);
-            dg_i_out.write(dg_i);
-            inv_i_out.write(inv_i);
-        }
-
-        inv_j_out.write(inv_j);
-
-        if (i != 0) {
-            // pass on everything but the first element
-            df_j_out.write(df_j);
-            dg_j_out.write(dg_j);
-        }
-
+        rowAggregate_m[k] = !exclusionZone ? (aggregate_t) {PearsonCorrelation, stage + k} : aggregate_t_init;
+        columnAggregate_m[k] = !exclusionZone ? (aggregate_t) {PearsonCorrelation, k} : aggregate_t_init;
     }
+    // =============== [/Compute] ===============
 
-    MatrixProfileForwardRowAggregate:
-    for (index_t i = 0; i < stage; ++i) {
-        #pragma HLS PIPELINE II=1
-        // forward row aggregate
-        rowAggregate_out.write(rowAggregate_in.read());
+    // =============== [Reduce] ===============
+    MatrixProfileReduce:
+    for (index_t k = 0; k < n - m + 1; ++k) {
+        // get previous aggregates from predecessor
+        aggregate_t prevRowAggregate = rowAggregate_in.read();
+        aggregate_t prevColumnAggregate = columnAggregate_in.read();
+        // get aggregates computed in the current processing element (if applicable)
+        aggregate_t rowAggregate = (k <= n - m - stage) ? rowAggregate_m[k] : aggregate_t_init;
+        aggregate_t columnAggregate = (k >= stage) ? columnAggregate_m[k - stage] : aggregate_t_init;
+        // forward reduced aggregates
+        rowAggregate_out.write(rowAggregate.value > prevRowAggregate.value ? rowAggregate : prevRowAggregate);
+        columnAggregate_out.write(columnAggregate.value > prevColumnAggregate.value ? columnAggregate : prevColumnAggregate);
     }
+    // =============== [/Reduce] ===============
 }
 
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
@@ -220,25 +199,20 @@ data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
-void StreamToMemory(stream<aggregate_t, stream_d> &rowAggregate, stream<aggregate_t, stream_d> &columnAggregate, data_t *MP, index_t *MPI) {
-     // local "cache" storing the column aggregates (to merge them later)
-    aggregate_t aggregates_m[n - m + 1];
+void StreamToMemory(stream<aggregate_t, stream_d> &rowAggregates, stream<aggregate_t, stream_d> &columnAggregates, data_t *MP, index_t *MPI) {
+    // TODO: Add Comment(s)
+    StreamToMemoryReduce:
+    for (index_t k = 0; k < n - m + 1; ++k) {
+        aggregate_t rowAggregate = rowAggregates.read();
+        aggregate_t columnAggregate = columnAggregates.read();
 
-    // read column-wise aggregates and cache
-    StreamToMemoryReduceColumns:
-    for (index_t i = 0; i < n - m + 1; ++i) {
-        #pragma HLS PIPELINE II=1
-        aggregates_m[i] = columnAggregate.read();
-    }
-
-    // read row-wise aggreagtes and merge
-    StreamToMemoryReduceRows:
-    for (index_t i = 0; i < n - m + 1; ++i) {
-        #pragma HLS PIPELINE II=1
-        aggregate_t rAggregate = rowAggregate.read();
-        aggregate_t cAggregate = aggregates_m[i];
-        MP[i] = PearsonCorrelationToEuclideanDistance(rAggregate.value > cAggregate.value ? rAggregate.value : cAggregate.value);
-        MPI[i] = rAggregate.value > cAggregate.value ? rAggregate.index : cAggregate.index;
+        if (rowAggregate.value > columnAggregate.value) {
+            MP[k] = PearsonCorrelationToEuclideanDistance(rowAggregate.value);
+            MPI[k] = rowAggregate.index;
+        } else {
+            MP[k] = PearsonCorrelationToEuclideanDistance(columnAggregate.value);
+            MPI[k] = columnAggregate.index;
+        }
     }
 }
 
