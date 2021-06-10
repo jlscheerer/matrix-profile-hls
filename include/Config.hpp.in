@@ -7,6 +7,11 @@
 #pragma once
 
 #include <cstdlib>
+#include <ap_fixed.h>
+
+// 8-bit variable with 6 bits representing the numbers above the decimal point
+// and 12-bits representing the value below the decimal point
+using ap1 = ap_fixed<18, 6, AP_RND>;
 
 // type alias for time series & resulting matrix profile
 using data_t = ${MP_DATA_TYPE};
@@ -30,24 +35,30 @@ static constexpr index_t sublen = n - m + 1;
 namespace MatrixProfileConfig {
     
     template<typename T>
-    constexpr T AggregateInit();
+    static const T AggregateInit();
 
     template<>
-    constexpr double AggregateInit() { return -1e12; }
+    const double AggregateInit() { return -1e12; }
+
+    template<>
+    const float AggregateInit() { return -1e12; }
+
+    template<>
+    const ap1 AggregateInit() { return -62; }
 
     template<typename T>
-    constexpr T IndexInit();
+    static const T IndexInit();
 
     template<>
-    constexpr int IndexInit() { return -1; }
+    const int IndexInit() { return -1; }
 
 }
 
 // "negative infinity" used to initialize aggregates
-static constexpr data_t aggregate_init = MatrixProfileConfig::AggregateInit<data_t>();
+static const data_t aggregate_init = MatrixProfileConfig::AggregateInit<data_t>();
 
 // used to indicate an invalid/undetermined index
-static constexpr index_t index_init = MatrixProfileConfig::IndexInit<index_t>();
+static const index_t index_init = MatrixProfileConfig::IndexInit<index_t>();
 
 // "translate" the selected kernel implementation (type) to a readable string
 #define KERNEL_IMPL_NAME "v${MP_KERNEL}"

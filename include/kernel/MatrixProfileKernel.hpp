@@ -12,7 +12,7 @@ typedef struct {
     index_t index;
 } aggregate_t;
 
-static constexpr aggregate_t aggregate_t_init{aggregate_init, index_init};
+static const aggregate_t aggregate_t_init{aggregate_init, index_init};
 
 extern "C" {
 

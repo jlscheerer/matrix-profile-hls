@@ -109,6 +109,8 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
     // =============== [Reduce] ===============
     PrecomputationInitReduce:
     for (index_t i = 0; i < n - m + 1; ++i) {
+        #pragma HLS PIPELINE II=1
+        
         columnAggregate.write(aggregate_t_init);
         rowAggregate.write(aggregate_t_init);
     }
@@ -134,6 +136,8 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
     // =============== [Scatter] ===============
     MatrixProfileScatter:
     for (index_t k = 0; k < n - m + 1 - stage; ++k) {
+        #pragma HLS PIPELINE II=1
+
         data_t QTforward = QT_in.read();
         data_t dfi = df_i_in.read(), dgi = dg_i_in.read(), invi = inv_i_in.read();
         data_t dfj = df_j_in.read(), dgj = dg_j_in.read(), invj = inv_j_in.read();
@@ -168,10 +172,12 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
     const bool exclusionZone = stage < m/4;
     MatrixProfileCompute:
     for (index_t k = 0; k < n - m + 1 - stage; ++k) {
+        #pragma HLS PIPELINE II=1
+
         data_t dfi = dfi_m[k], dgi = dgi_m[k], invi = invi_m[k];
         data_t dfj = dfj_m[k], dgj = dgj_m[k], invj = invj_m[k];
 
-        QT = QT + dfi * dgj + dfj * dgi;
+        QT += dfi * dgj + dfj * dgi;
         PearsonCorrelation = QT * invi * invj;
 
         rowAggregate_m[k] = !exclusionZone ? (aggregate_t) {PearsonCorrelation, stage + k} : aggregate_t_init;
@@ -182,6 +188,7 @@ void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_
     // =============== [Reduce] ===============
     MatrixProfileReduce:
     for (index_t k = 0; k < n - m + 1; ++k) {
+        #pragma HLS PIPELINE II=1
         // get previous aggregates from predecessor
         aggregate_t prevRowAggregate = rowAggregate_in.read();
         aggregate_t prevColumnAggregate = columnAggregate_in.read();
@@ -204,16 +211,13 @@ void StreamToMemory(stream<aggregate_t, stream_d> &rowAggregates, stream<aggrega
     // TODO: Add Comment(s)
     StreamToMemoryReduce:
     for (index_t k = 0; k < n - m + 1; ++k) {
+        #pragma HLS PIPELINE II=1
+
         aggregate_t rowAggregate = rowAggregates.read();
         aggregate_t columnAggregate = columnAggregates.read();
 
-        if (rowAggregate.value > columnAggregate.value) {
-            MP[k] = PearsonCorrelationToEuclideanDistance(rowAggregate.value);
-            MPI[k] = rowAggregate.index;
-        } else {
-            MP[k] = PearsonCorrelationToEuclideanDistance(columnAggregate.value);
-            MPI[k] = columnAggregate.index;
-        }
+        MP[k] = PearsonCorrelationToEuclideanDistance((rowAggregate.value > columnAggregate.value) ? rowAggregate.value : columnAggregate.value);
+        MPI[k] = (rowAggregate.value > columnAggregate.value) ? rowAggregate.index : columnAggregate.index;
     }
 }
 
@@ -231,18 +235,11 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
     // Streams required to calculate Correlations
     stream<data_t, stream_d> QT[numStages + 1];
-
-    stream<data_t, stream_d> df_i[numStages + 1];
-    stream<data_t, stream_d> dg_i[numStages + 1];
-    stream<data_t, stream_d> inv_i[numStages + 1];
-
-    stream<data_t, stream_d> df_j[numStages + 1];
-    stream<data_t, stream_d> dg_j[numStages + 1];
-    stream<data_t, stream_d> inv_j[numStages + 1];
+    stream<data_t, stream_d> df_i[numStages + 1], dg_i[numStages + 1], inv_i[numStages + 1];
+    stream<data_t, stream_d> df_j[numStages + 1], dg_j[numStages + 1], inv_j[numStages + 1];
 
     // Store the intermediate results
-    stream<aggregate_t, stream_d> rowAggregate[numStages + 1];
-    stream<aggregate_t, stream_d> columnAggregate[numStages + 1];
+    stream<aggregate_t, stream_d> rowAggregate[numStages + 1], columnAggregate[numStages + 1];
 
     MemoryToStream(T, QT[0], df_i[0], df_j[0], dg_i[0], dg_j[0], inv_i[0], inv_j[0], rowAggregate[0], columnAggregate[0]);
 
