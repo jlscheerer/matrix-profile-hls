@@ -115,6 +115,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
     // =============== [/Reduce] ===============
 }
 
+// TODO: Potentially Template this function to avoid unnecessary memory/ressource consumption of "caches"
 void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_d> &QT_in, stream<data_t, stream_d> &df_i_in, stream<data_t, stream_d> &df_j_in, 
                                      stream<data_t, stream_d> &dg_i_in, stream<data_t, stream_d> &dg_j_in, stream<data_t, stream_d> &inv_i_in, stream<data_t, stream_d> &inv_j_in, 
                                      stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in, stream<data_t, stream_d> &QT_out,
