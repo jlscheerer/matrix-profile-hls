@@ -44,7 +44,7 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     // cwd: /media/sd-mmcblk0p1
     // Load Input File Containing Time Series Data into Host Memory
     Log<LogLevel::Verbose>("Loading input time series...");
-    if(!FileIO::ReadBinaryFile<data_t>("data/binary/" + input + ".tsb", host_T))
+    if(!FileIO::ReadBinaryFile("data/binary/" + input + ".tsb", host_T))
         return EXIT_FAILURE;
 
     Log<LogLevel::Verbose>("Initializing OpenCL context...");
@@ -88,11 +88,11 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     if(output){
         Log<LogLevel::Verbose>("Saving results (MP/MPI) to file...");
         // Write the Matrix Profile to disk
-        if(!FileIO::WriteBinaryFile<data_t>((*output) + ".mpb", host_MP))
+        if(!FileIO::WriteBinaryFile((*output) + ".mpb", host_MP))
             return EXIT_FAILURE;
 
         // Write the Matrix Profile Index to disk
-        if(!FileIO::WriteBinaryFile<index_t>((*output) + ".mpib", host_MPI))
+        if(!FileIO::WriteBinaryFile((*output) + ".mpib", host_MPI))
             return EXIT_FAILURE;
     }else{
         // Just output the result to the console (for debugging)

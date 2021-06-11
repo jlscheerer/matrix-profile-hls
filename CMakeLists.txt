@@ -42,7 +42,7 @@ set(HOST_COMPILE_COMMAND
     -I/opt/xilinx/vitis/Vivado/2020.1/include/
     -I"${CMAKE_CURRENT_SOURCE_DIR}/include"
     -I/opt/xilinx/petalinux/sysroots/aarch64-xilinx-linux/usr/include/xrt/
-    -O0 -g -Wall -c -fmessage-length=0
+    -O0 -g -c -fmessage-length=0
     --sysroot=/opt/xilinx/petalinux/sysroots/aarch64-xilinx-linux)
 
 set(HOST_LINK_COMMAND

@@ -9,9 +9,32 @@
 #include <cstdlib>
 #include <ap_fixed.h>
 
-// 8-bit variable with 6 bits representing the numbers above the decimal point
-// and 12-bits representing the value below the decimal point
-using ap1 = ap_fixed<18, 6, AP_RND>;
+// Arbitrary Precision Fixed-Point Data Type - Definitions
+// For More Information visit https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/use_arbitrary_precision_data_type.html
+
+// 16 bit Arbitrary Precision Fixed-Point Data Type
+// 5 bits (incl. sign) for integral part; 11 bits for fractional part
+// AP_RND_ZERO=Round to zero; AP_WRAP_SM=Sign magnitude wrap around
+// [-16, 15] . (2048 / 2047)
+using ap16_t = ap_fixed<16, 5, AP_RND_ZERO, AP_WRAP_SM>;
+
+// 24 bit Arbitrary Precision Fixed-Point Data Type
+// 8 bits (incl. sign) for integral part; 16 bits for fractional part
+// AP_RND_ZERO=Round to zero; AP_WRAP_SM=Sign magnitude wrap around
+// [-128, 127] . (65535 / 65536)
+using ap24_t = ap_fixed<24, 8, AP_RND_ZERO, AP_WRAP_SM>;
+
+// 32 bit Arbitrary Precision Fixed-Point Data Type
+// 11 bits (incl. sign) for integral part; 21 bits for fractional part
+// AP_RND_ZERO=Round to zero; AP_WRAP_SM=Sign magnitude wrap around
+// [-1024, 1023] . (2097151 / 2097152)
+using ap32_t = ap_fixed<32, 11, AP_RND_ZERO, AP_WRAP_SM>;
+
+// 64 bit Arbitrary Precision Fixed-Point Data Type
+// 14 bits (incl. sign) for integral part; 50 bits for fractional part
+// AP_RND_ZERO=Round to zero; AP_WRAP_SM=Sign magnitude wrap around
+// [-8192, 8191] . (1125899906842623.0 / 1125899906842624)
+using ap64_t = ap_fixed<64, 14, AP_RND_ZERO, AP_WRAP_SM>;
 
 // type alias for time series & resulting matrix profile
 using data_t = ${MP_DATA_TYPE};
@@ -34,6 +57,11 @@ static constexpr index_t sublen = n - m + 1;
 
 namespace MatrixProfileConfig {
     
+    template<int W, int I> 
+    constexpr ap_fixed<W, I, AP_RND_ZERO, AP_WRAP_SM> ninfty() {
+        return -((1LL << (I-1)));
+    }
+
     template<typename T>
     static const T AggregateInit();
 
@@ -44,7 +72,16 @@ namespace MatrixProfileConfig {
     const float AggregateInit() { return -1e12; }
 
     template<>
-    const ap1 AggregateInit() { return -62; }
+    const ap16_t AggregateInit() { return ninfty<16, 5>(); }
+
+    template<>
+    const ap24_t AggregateInit() { return ninfty<24, 8>(); }
+
+    template<>
+    const ap32_t AggregateInit() { return ninfty<32, 11>(); }
+
+    template<>
+    const ap64_t AggregateInit() { return ninfty<64, 14>(); }
 
     template<typename T>
     static const T IndexInit();
