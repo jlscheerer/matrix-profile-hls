@@ -1,3 +1,9 @@
+/**
+ * @file    MatrixProfileReference.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   TODO: Add Brief Description
+ */
+
 #pragma once
 
 #include <cstdlib>

@@ -1,3 +1,9 @@
+/**
+ * @file    MockInitialize.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   TODO: Add Brief Description
+ */
+
 #pragma once
 
 namespace MatrixProfileTests {

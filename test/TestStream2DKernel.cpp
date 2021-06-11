@@ -1,3 +1,9 @@
+/**
+ * @file    TestStream2DKernel.cpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   TODO: Add Brief Description
+ */
+
 #include "MatrixProfileTests.hpp"
 #include "MockInitialize.hpp"
 

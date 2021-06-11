@@ -1,3 +1,9 @@
+/**
+ * @file    MockConfig.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   TODO: Add Brief Description
+ */
+
 #pragma once
 
 template<typename T>
