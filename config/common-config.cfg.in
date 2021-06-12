@@ -1,2 +1,2 @@
-platform=xilinx_zcu102_base_202010_1
+platform=${MP_PLATFORM}
 save-temps=1
