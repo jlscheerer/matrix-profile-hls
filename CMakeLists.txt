@@ -27,6 +27,13 @@ set(MP_KERNEL "Stream2D" CACHE STRING "implementation to use for the matrix prof
 
 set(MP_TARGET "hw_emu" CACHE STRING "compile target: {sw_emu, hw_emu, hw}")
 
+# Set Connectivity Property
+if(MP_EMBEDDED)
+    set(CONNECTIVITY_SP "HP")
+else()
+    set(CONNECTIVITY_SP "bank")
+endif()
+
 # Custom option to enable software testing using google-test
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
 option(BUILD_TESTS "Build software tests (google-test)" OFF)
