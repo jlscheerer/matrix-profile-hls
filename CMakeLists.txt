@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 
 # set to NONE to avoid/skip compiler checks
-project(MatrixProfileHLS NONE)
+project(MatrixProfileHLS)
 
 set(CMAKE_CXX_STANDARD 11)
 
