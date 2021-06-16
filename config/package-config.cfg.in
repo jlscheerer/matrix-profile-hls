@@ -4,7 +4,7 @@ save-temps=1
 
 [package]
 domain=xrt
-sd_file=matrix-profile-hls
+sd_file=MatrixProfileHost
 rootfs=${MP_ROOT_FS}
 kernel_image=${MP_KERNEL_IMAGE}
 out_dir=./package

@@ -15,9 +15,8 @@ make package_sd
 ```
 
 ### Launch the Emulator
-In the /build directory run:
 ```bash
-./package/launch_hw_emu.sh
+make launch_emulator
 ```
 
 ### Configure Environment Variables for Emulator
@@ -33,7 +32,7 @@ export XILINX_VITIS=/mnt
 
 ### Running
 ```bash
-./matrix-profile-hls -b mp_binary_container.xclbin -i small8_syn --verbose
+./MatrixProfileHost -b MatrixProfileKernel.xclbin -i small8_syn --verbose
 ```
 
 > Data-Set Source: https://github.com/matrix-profile-foundation/mpf-datasets

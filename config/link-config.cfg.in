@@ -1,8 +1,8 @@
 debug=1
-messageDb=mp_binary_container.mdb
-temp_dir=mp_binary_container.build
-report_dir=mp_binary_container.build/reports
-log_dir=mp_binary_container.build/logs
+messageDb=MatrixProfileKernel.mdb
+temp_dir=MatrixProfileKernel.build
+report_dir=MatrixProfileKernel.build/reports
+log_dir=MatrixProfileKernel.build/logs
 remote_ip_cache=/u/home/scheerer/workspace/ip_cache
 
 [advanced]

@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 # Matrix Profile Target Options
 set(MP_PLATFORM "xilinx_zcu102_base_202010_1" CACHE STRING "Platform for Vitis (--platform)")
+
 # https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/embeddedplatforms.html
 option(MP_EMBEDDED "build for Vitis Embedded Platforms" ON)
 
@@ -78,21 +79,6 @@ if(("${MP_KERNEL}" STREQUAL "Stream2D") AND (NOT(${MP_SIZE_T} MATCHES "^[0-9]+$"
     message(FATAL_ERROR "The specified value for 'MP_SIZE_T' [\"${MP_SIZE_T}\"] is invalid, t has to be numeric and ≥ m!")
 endif()
 # /check parameter validity
-
-# build information
-message(STATUS "Preparing build for ${MP_KERNEL}-Kernel (Target: ${MP_TARGET})")
-if(MP_EMBEDDED)
-    message(STATUS "Building for Embedded Platforms")
-endif()
-
-if("${MP_KERNEL}" STREQUAL "Stream2D")
-    message(STATUS "MatrixProfile: n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, t = ${MP_SIZE_T}")
-else()
-    message(STATUS "MatrixProfile: n = ${MP_SIZE_N}, m = ${MP_SIZE_M}")
-endif()
-
-message(STATUS "Using data_t = ${MP_DATA_TYPE} and index_t = ${MP_INDEX_TYPE}")
-# /build information
 
 if(DEFINED ENV{LIBRARY_PATH})
     # Override MP_LIBRARY_PATH if LIBRARAY_PATH environment variable is set explicitly
@@ -183,25 +169,27 @@ if(MP_EMBEDDED)
         -I"${CMAKE_CURRENT_BINARY_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/include"
         -I"$ENV{XILINX_VIVADO}/include/" -I${MP_SYSROOT}/usr/include/xrt/
         --sysroot=${MP_SYSROOT} -O3 -c)
+    set(HOST_LINK_COMMAND -lxilinxopencl -lpthread -lrt -ldl -lcrypt -lstdc++ -L${MP_SYSROOT}/usr/lib/ --sysroot=${MP_SYSROOT})
 else()
     set(HOST_COMPILE_COMMAND
         -std=c++11 -DVITIS_PLATFORM=${MP_PLATFORM} -D__USE_XOPEN2K8
         -I"${CMAKE_CURRENT_BINARY_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/include"
         -I"$ENV{XILINX_VIVADO}/include/" -I"$ENV{XILINX_XRT}/include/"
         -O3 -c)
+    set(HOST_LINK_COMMAND -L$ENV{XILINX_XRT}/lib/ -lOpenCL -lpthread -lrt -lstdc++)
 endif()
 
-if(MP_EMBEDDED)
-    set(HOST_LINK_COMMAND
-        -lxilinxopencl -lpthread -lrt -ldl -lcrypt -lstdc++
-        -L${MP_SYSROOT}/usr/lib/ --sysroot=${MP_SYSROOT})
-else()
-    set(HOST_LINK_COMMAND
-        -L$ENV{XILINX_XRT}/lib/ -lOpenCL -lpthread -lrt -lstdc++)
-endif()
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o
+                   COMMENT "Compiling Host Application (n = ${MP_SIZE_N}, m = ${MP_SIZE_M})"
+                   COMMAND ${HOST_COMPILER} ${HOST_COMPILE_COMMAND} -o "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o" "${CMAKE_CURRENT_SOURCE_DIR}/host/MatrixProfileHost.cpp"
+                   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/host/MatrixProfileHost.cpp")
 
-add_custom_target(host COMMAND ${HOST_COMPILER} ${HOST_COMPILE_COMMAND} -o "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o" "${CMAKE_CURRENT_SOURCE_DIR}/host/MatrixProfileHost.cpp"
-                       COMMAND ${HOST_COMPILER} -o "${CMAKE_CURRENT_BINARY_DIR}/matrix-profile-hls" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o" ${HOST_LINK_COMMAND})
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost
+                   COMMENT "Linking Host Application"
+                   COMMAND ${HOST_COMPILER} -o "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o" ${HOST_LINK_COMMAND}
+                   DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o")
+
+add_custom_target(host DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost)
 
 # Kernel (Compile & Link)
 set(KERNEL_COMPILE_COMMAND
@@ -211,20 +199,43 @@ set(KERNEL_COMPILE_COMMAND
     --config "${CMAKE_CURRENT_BINARY_DIR}/config/compile-config.cfg"
     -I"${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-add_custom_target(compile COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_COMPILE_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp")
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo
+                   COMMENT "Compiling ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
+                   COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_COMPILE_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp"
+                   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp"
+                           "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
+                           "${CMAKE_CURRENT_BINARY_DIR}/config/compile-config.cfg")
+
+add_custom_target(compile DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo)
 
 set(KERNEL_LINK_COMMAND
     --link --config "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg" --config "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 
-add_custom_target(link COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo")
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
+                   COMMENT "Linking ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
+                   COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
+                   DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
+                           "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
+                           "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 
-# Packaging Only Relevant for Embedded Platforms
+add_custom_target(link DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin")
+
+# Packaging (SD-Card) Only Relevant for Embedded Platforms
 if(MP_EMBEDDED)
-    # Package SD-Card
     set(PACKAGE_COMMAND --package --config "${CMAKE_CURRENT_BINARY_DIR}/config/package-config.cfg" --package.sd_dir "${CMAKE_CURRENT_SOURCE_DIR}/data")
-    add_custom_target(package_sd COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${PACKAGE_COMMAND} "${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin")
+
+    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/package/sd_card.img" "${CMAKE_CURRENT_BINARY_DIR}/package/launch_hw_emu.sh"
+                       COMMENT "Packaging SD-Card for Embedded Platforms"
+                       COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${PACKAGE_COMMAND} "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
+                       DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost"
+                               "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
+                               "${CMAKE_CURRENT_BINARY_DIR}/config/package-config.cfg")
+
+    add_custom_target(package_sd DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/package/sd_card.img" "${CMAKE_CURRENT_BINARY_DIR}/package/launch_hw_emu.sh")
+    
     # Launch the Emulator via the generated script and set necessary environment variables
-    add_custom_target(launch_emulator COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" /bin/bash "${CMAKE_CURRENT_BINARY_DIR}/package/launch_hw_emu.sh")
+    add_custom_target(launch_emulator COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" /bin/bash "${CMAKE_CURRENT_BINARY_DIR}/package/launch_hw_emu.sh" 
+                                      DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/package/sd_card.img" "${CMAKE_CURRENT_BINARY_DIR}/package/launch_hw_emu.sh")
 endif()
 
 # Software Testing via GoogleTest (https://github.com/google/googletest)
@@ -235,7 +246,6 @@ if(BUILD_TESTS)
                             "'git submodule update --init'")
     endif()
     
-    message(STATUS "Preparing build for Tests")
     # make sure to clone respositore with --recursive
     # or download via git submodule update --init 
     add_subdirectory(googletest)
