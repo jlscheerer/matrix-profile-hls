@@ -26,11 +26,6 @@ static constexpr index_t max(const index_t a, const index_t b){ return (a > b) ?
 // https://math.stackexchange.com/questions/2134011/conversion-of-upper-triangle-linear-index-from-index-on-symmetrical-array
 static constexpr index_t index2D(const index_t x, const index_t y) { return (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + x; }
 
-static constexpr index_t map2DX(const index_t index, const index_t tiles) { return (index == (tiles-1) ? index-1 : (index >= tiles ? 1 + map2DX(index-tiles, tiles-1) : index)); }
-static constexpr index_t map2DY(const index_t index, const index_t tiles) { return index >= tiles ? 1 + map2DY(index - tiles, tiles-1) : 0; }
-static constexpr bool isComputeProcessingElement(const index_t index, index_t tiles) { return (index == (tiles-1) ? false : (index < tiles || isComputeProcessingElement(index-tiles, tiles-1))); }
-
-
 void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t, stream_d> &sMu,
                     stream<data_t, stream_d> &sDf, stream<data_t, stream_d> &sDg, stream<data_t, stream_d> &sInv) {
     // store the previous (m-1) T-values in local "cache" (acts as shift-register)
@@ -542,32 +537,30 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
     MemoryToStream(T, sT[0], sMu[0], sDf[0], sDg[0], sInv[0]);
 
-    // (nTiles * (nTiles + 1) / 2) Compute Processing Elements along the Hyper Upper Triangular Matrix
-    // + nTiles Reduction Processing Elements
-    constexpr index_t numberOfProcessingElements = (nTiles * (nTiles + 1)) / 2 + nTiles;
-    for (index_t k = 0; k < numberOfProcessingElements; ++k) {
+    #ifdef TEST_MOCK_SW
+    for (index_t y = 0; y < nTiles; ++y) {
         #pragma HLS UNROLL
-        const index_t x = map2DX(k, nTiles + 1);
-        const index_t y = map2DY(k, nTiles + 1);
-        const bool compute = isComputeProcessingElement(k, nTiles + 1);
-        if (compute && x == y) {
-            const index_t beginIndex = index2D(y, y);
-            ScatterLaneStreamingUnit(y, y, sT[y], sMu[y], sDf[y], sDg[y], sInv[y], Ti[beginIndex], Tj[beginIndex],
+        const index_t beginIndex = index2D(y, y);
+        ScatterLaneStreamingUnit(y, y, sT[y], sMu[y], sDf[y], sDg[y], sInv[y], Ti[beginIndex], Tj[beginIndex],
                 mui[beginIndex], muj[beginIndex], dfi[beginIndex], dfj[beginIndex], dgi[beginIndex],
                 dgj[beginIndex], invi[beginIndex], invj[beginIndex], rowAggregate[beginIndex], columnAggregate[beginIndex],
                 sT[y + 1], sMu[y + 1], sDf[y + 1], sDg[y + 1], sInv[y + 1]);
-        } else if (compute) {
-            const index_t index = index2D(x, y);
+
+        for (index_t x = y + 1; x < nTiles; ++x) {
+            #pragma HLS UNROLL
+            index_t index = index2D(x, y);
             RowLaneStreamingUnit(y, x, Ti[index - 1], Tj[index - 1], mui[index - 1], muj[index - 1],
                     dfi[index - 1], dfj[index - 1], dgi[index - 1], dgj[index - 1], invi[index - 1],
                     invj[index - 1], rowAggregate[index - 1], columnAggregate[index - 1], Ti[index],
                     Tj[index], mui[index], muj[index], dfi[index], dfj[index], dgi[index], dgj[index], 
                     invi[index], invj[index], rowAggregate[index], columnAggregate[index]);
-        } else {
-            const index_t endIndex = index2D(nTiles - 1, y);
-            RowReductionUnit(y, rRow[y], rCol[y], rowAggregate[endIndex], columnAggregate[endIndex], rRow[y + 1], rCol[y + 1]);
         }
+        const index_t endIndex = index2D(nTiles - 1, y);
+        RowReductionUnit(y, rRow[y], rCol[y], rowAggregate[endIndex], columnAggregate[endIndex], rRow[y + 1], rCol[y + 1]);
     }
+    #else
+        #include "kernel/Stream2DInit.hpp"
+    #endif
 
     StreamToMemory(rRow[nTiles], rCol[nTiles], MP, MPI);
 }

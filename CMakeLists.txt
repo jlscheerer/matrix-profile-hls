@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
 
-# set to NONE to avoid/skip compiler checks
 project(MatrixProfileHLS)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -38,6 +37,8 @@ endif()
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
 option(BUILD_TESTS "Build software tests (google-test)" OFF)
 
+# TODO: Check validity of parameters!
+
 # Create the configuration file
 configure_file(include/Config.hpp.in Config.hpp)
 
@@ -51,8 +52,6 @@ if(MP_EMBEDDED)
     configure_file(config/package-config.cfg.in config/package-config.cfg)
 endif()
 
-# TODO: Check validity of parameters!
-
 if(MP_EMBEDDED)
     set(HOST_COMPILER "aarch64-linux-gnu-g++")
 else()
@@ -60,6 +59,40 @@ else()
 endif()
 
 set(VITIS_COMPILER "$ENV{XILINX_VITIS}/bin/v++")
+
+if("${MP_KERNEL}" STREQUAL "Stream2D")
+    # Generate Completely Unrolled Loop Code
+    MATH(EXPR nTiles "((${MP_SIZE_N}-${MP_SIZE_M}+${MP_SIZE_T}) / ${MP_SIZE_T})")
+    function(index2D x y)
+        MATH(EXPR index "(${nTiles} * (${nTiles} - 1)) / 2 - ((${nTiles} - ${y}) * (${nTiles} - ${y} - 1)) / 2 + ${x}")
+        set(index ${index} PARENT_SCOPE)
+    endfunction()
+
+    MATH(EXPR nTiles_1 "${nTiles} - 1")
+    foreach(y RANGE "${nTiles_1}")
+        index2D(${y} ${y})
+        MATH(EXPR y_1 "${y} + 1")
+        set(Stream2DInitSource "${Stream2DInitSource}ScatterLaneStreamingUnit(${y}, ${y}, sT[${y}], sMu[${y}], sDf[${y}], sDg[${y}], sInv[${y}], Ti[${index}], Tj[${index}], 
+                        mui[${index}], muj[${index}], dfi[${index}], dfj[${index}], dgi[${index}], dgj[${index}], invi[${index}], invj[${index}], 
+                        rowAggregate[${index}], columnAggregate[${index}], sT[${y_1}], sMu[${y_1}], sDf[${y_1}], sDg[${y_1}], sInv[${y_1}]);\n\n")
+        if(NOT (${nTiles_1} LESS ${y_1}))
+            foreach(x RANGE ${y_1} ${nTiles_1})
+                index2D(${x} ${y})
+                MATH(EXPR index_1 "${index} - 1")
+                set(Stream2DInitSource "${Stream2DInitSource}RowLaneStreamingUnit(${y}, ${x}, Ti[${index_1}], Tj[${index_1}], mui[${index_1}], muj[${index_1}],
+                            dfi[${index_1}], dfj[${index_1}], dgi[${index_1}], dgj[${index_1}], invi[${index_1}],
+                            invj[${index_1}], rowAggregate[${index_1}], columnAggregate[${index_1}], Ti[${index}],
+                            Tj[${index}], mui[${index}], muj[${index}], dfi[${index}], dfj[${index}], dgi[${index}], dgj[${index}], 
+                            invi[${index}], invj[${index}], rowAggregate[${index}], columnAggregate[${index}]);\n\n")
+            endforeach()
+        endif()
+
+        index2D(${nTiles_1} ${y})
+        set(Stream2DInitSource "${Stream2DInitSource}RowReductionUnit(${y}, rRow[${y}], rCol[${y}], rowAggregate[${index}], columnAggregate[${index}], rRow[${y_1}], rCol[${y_1}]);\n\n")
+    endforeach()
+
+    configure_file(include/kernel/Stream2DInit.hpp.in include/kernel/Stream2DInit.hpp)
+endif()
 
 # Host Application (Compile & Link)
 if(MP_EMBEDDED)
