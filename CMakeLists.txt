@@ -91,7 +91,7 @@ if("${MP_KERNEL}" STREQUAL "Stream2D")
         set(Stream2DInitSource "${Stream2DInitSource}RowReductionUnit(${y}, rRow[${y}], rCol[${y}], rowAggregate[${index}], columnAggregate[${index}], rRow[${y_1}], rCol[${y_1}]);\n\n")
     endforeach()
 
-    configure_file(include/kernel/Stream2DInit.hpp.in include/kernel/Stream2DInit.hpp)
+    configure_file(include/kernel/Stream2DInit.hpp.in kernel/Stream2DInit.hpp)
 endif()
 
 # Host Application (Compile & Link)
