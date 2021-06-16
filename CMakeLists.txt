@@ -1,6 +1,9 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.2)
 
 project(MatrixProfileHLS)
+
+CMAKE_POLICY(SET CMP0054 NEW)
+CMAKE_POLICY(SET CMP0057 NEW)
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -9,22 +12,107 @@ set(MP_PLATFORM "xilinx_zcu102_base_202010_1" CACHE STRING "Platform for Vitis (
 # https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/embeddedplatforms.html
 option(MP_EMBEDDED "build for Vitis Embedded Platforms" ON)
 
+set(VALID_TARGETS sw_emu hw_emu hw)
+set(MP_TARGET "hw_emu" CACHE STRING "compile target: {sw_emu, hw_emu, hw}")
+set_property(CACHE MP_TARGET PROPERTY STRINGS ${VALID_TARGETS})
+
+set(MP_LIBRARY_PATH "/usr/lib/x86_64-linux-gnu" CACHE STRING "LIBRARAY_PATH environment variable. Required for hw_emu, hw build targets (ignored if environment variable is set)")
+
 # Options for Embedded Platforms (Embedded acceleration requires a valid sysroot location)
 set(MP_SYSROOT "/opt/xilinx/petalinux/sysroots/aarch64-xilinx-linux" CACHE STRING "Application settings: Sysroot path")
 set(MP_ROOT_FS "/u/home/raoofy/xilinx-zynqmp-common-v2020.1/rootfs.ext4" CACHE STRING "Application settings: ROOT FS")
 set(MP_KERNEL_IMAGE "/u/home/raoofy/xilinx-zynqmp-common-v2020.1/Image" CACHE STRING "Application settings: Kernel Image")
 
 # Matrix Profile Computation Options
+set(VALID_KERNELS Streamless Stream1D Stream2D)
+set(MP_KERNEL "Stream2D" CACHE STRING "implementation to use for the matrix profile kernel {Streamless, Stream1D, Stream2D}")
+set_property(CACHE MP_KERNEL PROPERTY STRINGS ${VALID_KERNELS})
+
+set(VALID_DATA_TYPES double float ap16_t ap24_t ap32_t ap64_t)
 set(MP_DATA_TYPE "double" CACHE STRING "type for time series & resulting matrix profile")
+set_property(CACHE MP_DATA_TYPE PROPERTY STRINGS ${VALID_DATA_TYPES})
+
+set(VALID_INDEX_TYPES int)
 set(MP_INDEX_TYPE "int" CACHE STRING "type for the resulting matrix profile index")
+set_property(CACHE MP_INDEX_TYPE PROPERTY STRINGS ${VALID_INDEX_TYPES})
 
 set(MP_SIZE_N 8 CACHE STRING "length of the time series data")
 set(MP_SIZE_M 4 CACHE STRING "subsequence length for the matrix profile")
 set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream2D) [assumption: t ≥ m]")
 
-set(MP_KERNEL "Stream2D" CACHE STRING "implementation to use for the matrix profile kernel {Streamless, Stream1D, Stream2D}")
 
-set(MP_TARGET "hw_emu" CACHE STRING "compile target: {sw_emu, hw_emu, hw}")
+# Custom option to enable software testing using google-test
+# Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
+option(BUILD_TESTS "Build software tests (google-test)" OFF)
+
+# check parameter validity
+list(FIND VALID_TARGETS ${MP_TARGET} target_index)
+if(target_index EQUAL -1)
+    message(FATAL_ERROR "The specified value for 'MP_TARGET' [\"${MP_TARGET}\"] is invalid.\nTarget has to be one of 'sw_emu', 'hw_emu' or 'hw'.")
+endif()
+
+list(FIND VALID_KERNELS ${MP_KERNEL} kernel_index)
+if(kernel_index EQUAL -1)
+    message(FATAL_ERROR "The specified value for 'MP_KERNEL' [\"${MP_KERNEL}\"] is invalid.\nKernel has to be one of 'Streamless', 'Stream1D' or 'Stream2D'.")
+endif()
+
+list(FIND VALID_DATA_TYPES ${MP_DATA_TYPE} data_type_index)
+if(data_type_index EQUAL -1)
+    message(FATAL_ERROR "The specified value for 'MP_DATA_TYPE' [\"${MP_DATA_TYPE}\"] is invalid.\ndata_t has to be one of 'double', 'float', 'ap16_t', 'ap24_t', 'ap32_t' or 'ap64_t'.")
+endif()
+
+list(FIND VALID_INDEX_TYPES ${MP_INDEX_TYPE} index_type_index)
+if(index_type_index EQUAL -1)
+    message(FATAL_ERROR "The specified value for 'MP_INDEX_TYPE' [\"${MP_INDEX_TYPE}\"] is invalid.\nindex_t has to be one of 'int'.")
+endif()
+
+if(NOT(${MP_SIZE_N} MATCHES "^[0-9]+$"))
+    message(FATAL_ERROR "The specified value for 'MP_SIZE_N' [\"${MP_SIZE_N}\"] is invalid, n has to be numeric!")
+endif()
+
+if(NOT(${MP_SIZE_M} MATCHES "^[0-9]+$") OR ${MP_SIZE_N} LESS ${MP_SIZE_M})
+    message(FATAL_ERROR "The specified value for 'MP_SIZE_M' [\"${MP_SIZE_M}\"] is invalid, m has to be numeric and ≤ n!")
+endif()
+
+if(("${MP_KERNEL}" STREQUAL "Stream2D") AND (NOT(${MP_SIZE_T} MATCHES "^[0-9]+$") OR ${MP_SIZE_T} LESS ${MP_SIZE_M}))
+    message(FATAL_ERROR "The specified value for 'MP_SIZE_T' [\"${MP_SIZE_T}\"] is invalid, t has to be numeric and ≥ m!")
+endif()
+# /check parameter validity
+
+# build information
+message(STATUS "Preparing build for ${MP_KERNEL}-Kernel (Target: ${MP_TARGET})")
+if(MP_EMBEDDED)
+    message(STATUS "Building for Embedded Platforms")
+endif()
+
+if("${MP_KERNEL}" STREQUAL "Stream2D")
+    message(STATUS "MatrixProfile: n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, t = ${MP_SIZE_T}")
+else()
+    message(STATUS "MatrixProfile: n = ${MP_SIZE_N}, m = ${MP_SIZE_M}")
+endif()
+
+message(STATUS "Using data_t = ${MP_DATA_TYPE} and index_t = ${MP_INDEX_TYPE}")
+# /build information
+
+if(DEFINED ENV{LIBRARY_PATH})
+    # Override MP_LIBRARY_PATH if LIBRARAY_PATH environment variable is set explicitly
+    set(MP_LIBRARY_PATH $ENV{LIBRARY_PATH})
+endif()
+
+# Check that all required Environment Variables are set
+if(NOT(DEFINED ENV{XILINX_VITIS} AND DEFINED ENV{XILINX_VIVADO}))
+    message(FATAL_ERROR "Environment has not been setup correctly!\n"
+                        "XILINX_VITIS and/or XILINX_VIVADO environment variable(s) are not set.\n"
+                        "For further information see: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/settingupvitisenvironment.html\n"
+                        "Did you forget to run \"source <Vitis_install_path>/settings64.sh\"?")
+endif()
+
+if(NOT((DEFINED ENV{XILINX_XRT} AND DEFINED ENV{LD_LIBRARY_PATH}) AND DEFINED ENV{PYTHONPATH}))
+    message(FATAL_ERROR "Environment has not been setup correctly!\n"
+                        "XILINX_XRT and/or LD_LIBRARY_PATH and/or PYTHONPATH environment variable(s) are not set.\n"
+                        "For further information see: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/settingupvitisenvironment.html\n"
+                        "Did you forget to run \"source /opt/xilinx/xrt/setup.sh\"?")
+endif()
 
 # Set Connectivity Property
 if(MP_EMBEDDED)
@@ -32,12 +120,6 @@ if(MP_EMBEDDED)
 else()
     set(CONNECTIVITY_SP "bank")
 endif()
-
-# Custom option to enable software testing using google-test
-# Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
-option(BUILD_TESTS "Build software tests (google-test)" OFF)
-
-# TODO: Check validity of parameters!
 
 # Create the configuration file
 configure_file(include/Config.hpp.in Config.hpp)
@@ -90,31 +172,22 @@ if("${MP_KERNEL}" STREQUAL "Stream2D")
         index2D(${nTiles_1} ${y})
         set(Stream2DInitSource "${Stream2DInitSource}RowReductionUnit(${y}, rRow[${y}], rCol[${y}], rowAggregate[${index}], columnAggregate[${index}], rRow[${y_1}], rCol[${y_1}]);\n\n")
     endforeach()
-
+    # Write Generated Code to File (will be included in the Stream2D)
     configure_file(include/kernel/Stream2DInit.hpp.in kernel/Stream2DInit.hpp)
 endif()
 
 # Host Application (Compile & Link)
 if(MP_EMBEDDED)
     set(HOST_COMPILE_COMMAND
-        -std=c++11
-        -DVITIS_PLATFORM=${MP_PLATFORM}
-        -D__USE_XOPEN2K8
-        -I"${CMAKE_CURRENT_BINARY_DIR}"
-        -I"$ENV{XILINX_VIVADO}/include/"
-        -I"${CMAKE_CURRENT_SOURCE_DIR}/include"
-        -I${MP_SYSROOT}/usr/include/xrt/
-        --sysroot=${MP_SYSROOT}
-        -O3 -c)
+        -std=c++11 -DVITIS_PLATFORM=${MP_PLATFORM} -D__USE_XOPEN2K8
+        -I"${CMAKE_CURRENT_BINARY_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/include"
+        -I"$ENV{XILINX_VIVADO}/include/" -I${MP_SYSROOT}/usr/include/xrt/
+        --sysroot=${MP_SYSROOT} -O3 -c)
 else()
     set(HOST_COMPILE_COMMAND
-        -std=c++11
-        -DVITIS_PLATFORM=${MP_PLATFORM}
-        -D__USE_XOPEN2K8
-        -I"${CMAKE_CURRENT_BINARY_DIR}"
-        -I"$ENV{XILINX_XRT}/include/"
-        -I"$ENV{XILINX_VIVADO}/include/"
-        -I"${CMAKE_CURRENT_SOURCE_DIR}/include"
+        -std=c++11 -DVITIS_PLATFORM=${MP_PLATFORM} -D__USE_XOPEN2K8
+        -I"${CMAKE_CURRENT_BINARY_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/include"
+        -I"$ENV{XILINX_VIVADO}/include/" -I"$ENV{XILINX_XRT}/include/"
         -O3 -c)
 endif()
 
@@ -133,30 +206,25 @@ add_custom_target(host COMMAND ${HOST_COMPILER} ${HOST_COMPILE_COMMAND} -o "${CM
 # Kernel (Compile & Link)
 set(KERNEL_COMPILE_COMMAND
     --compile 
-    -I"${CMAKE_CURRENT_BINARY_DIR}"
-    -I"${CMAKE_CURRENT_SOURCE_DIR}/kernel"
+    -I"${CMAKE_CURRENT_BINARY_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/kernel"
     --config "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
     --config "${CMAKE_CURRENT_BINARY_DIR}/config/compile-config.cfg"
     -I"${CMAKE_CURRENT_SOURCE_DIR}/include")
 
+add_custom_target(compile COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_COMPILE_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp")
+
 set(KERNEL_LINK_COMMAND
-    --link
-    --config "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
-    --config "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
+    --link --config "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg" --config "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 
-add_custom_target(compile COMMAND ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_COMPILE_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp")
-
-add_custom_target(link COMMAND ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo")
+add_custom_target(link COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo")
 
 # Packaging Only Relevant for Embedded Platforms
 if(MP_EMBEDDED)
     # Package SD-Card
-    set(PACKAGE_COMMAND
-        --package
-        --config "${CMAKE_CURRENT_BINARY_DIR}/config/package-config.cfg"
-        --package.sd_dir "${CMAKE_CURRENT_SOURCE_DIR}/data")
-
-    add_custom_target(package_sd COMMAND ${VITIS_COMPILER} --target ${MP_TARGET} ${PACKAGE_COMMAND} "${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin")
+    set(PACKAGE_COMMAND --package --config "${CMAKE_CURRENT_BINARY_DIR}/config/package-config.cfg" --package.sd_dir "${CMAKE_CURRENT_SOURCE_DIR}/data")
+    add_custom_target(package_sd COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${PACKAGE_COMMAND} "${CMAKE_CURRENT_BINARY_DIR}/mp_binary_container.xclbin")
+    # Launch the Emulator via the generated script and set necessary environment variables
+    add_custom_target(launch_emulator COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" /bin/bash "${CMAKE_CURRENT_BINARY_DIR}/package/launch_hw_emu.sh")
 endif()
 
 # Software Testing via GoogleTest (https://github.com/google/googletest)
