@@ -229,6 +229,13 @@ endif()
 
 # Software Testing via GoogleTest (https://github.com/google/googletest)
 if(BUILD_TESTS)
+    if(NOT(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/googletest/CMakeLists.txt"))
+        message(FATAL_ERROR "Attempting to build tests without a valid installation of GoogleTest.\n"
+                            "Make sure to either clone the repository with '--recursive' or download it after cloning via:\n"
+                            "'git submodule update --init'")
+    endif()
+    
+    message(STATUS "Preparing build for Tests")
     # make sure to clone respositore with --recursive
     # or download via git submodule update --init 
     add_subdirectory(googletest)
