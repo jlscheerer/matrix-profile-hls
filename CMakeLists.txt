@@ -18,6 +18,7 @@ set(MP_TARGET "hw_emu" CACHE STRING "compile target: {sw_emu, hw_emu, hw}")
 set_property(CACHE MP_TARGET PROPERTY STRINGS ${VALID_TARGETS})
 
 set(MP_LIBRARY_PATH "/usr/lib/x86_64-linux-gnu" CACHE STRING "LIBRARAY_PATH environment variable. Required for hw_emu, hw build targets (ignored if environment variable is set)")
+option(MP_QUICK_BUILD "quick build option for v++" OFF)
 
 # Options for Embedded Platforms (Embedded acceleration requires a valid sysroot location)
 set(MP_SYSROOT "/opt/xilinx/petalinux/sysroots/aarch64-xilinx-linux" CACHE STRING "Application settings: Sysroot path")
@@ -40,7 +41,6 @@ set_property(CACHE MP_INDEX_TYPE PROPERTY STRINGS ${VALID_INDEX_TYPES})
 set(MP_SIZE_N 8 CACHE STRING "length of the time series data")
 set(MP_SIZE_M 4 CACHE STRING "subsequence length for the matrix profile")
 set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream2D) [assumption: t ≥ m]")
-
 
 # Custom option to enable software testing using google-test
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
@@ -191,6 +191,13 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost
 
 add_custom_target(host DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost)
 
+if(MP_QUICK_BUILD)
+    message(WARNING "MP_QUICK_BUILD is set! This can reduce kernel performance, and increase the resources used by the kernel!")
+    set(OPTIMIZATION_PARAMETER "-Oquick")
+else()
+    set(OPTIMIZATION_PARAMETER "-O3")
+endif()
+
 # Kernel (Compile & Link)
 set(KERNEL_COMPILE_COMMAND
     --compile 
@@ -201,7 +208,7 @@ set(KERNEL_COMPILE_COMMAND
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo
                    COMMENT "Compiling ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
-                   COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_COMPILE_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp"
+                   COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_COMPILE_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp"
                    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp"
                            "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
                            "${CMAKE_CURRENT_BINARY_DIR}/config/compile-config.cfg")
@@ -213,7 +220,7 @@ set(KERNEL_LINK_COMMAND
 
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
                    COMMENT "Linking ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
-                   COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
+                   COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
                    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
                            "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
                            "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
