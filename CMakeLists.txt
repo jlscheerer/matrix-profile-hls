@@ -225,7 +225,7 @@ set(KERNEL_LINK_COMMAND
     --link --config "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg" --config "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 
 
-if("${MP_TARGET}" STREQUAL "hw_emu")
+if(("${MP_TARGET}" STREQUAL "hw_emu") OR ("${MP_TARGET}" STREQUAL "sw_emu"))
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/emconfig.json"
                     COMMENT "Generating emconfig.json file for hardware emulation."
                     COMMAND "$ENV{XILINX_VITIS}/bin/emconfigutil --platform ${MP_PLATFORM}")
@@ -238,7 +238,7 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbi
                            "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
                            "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 
-if("${MP_TARGET}" STREQUAL "hw_emu")
+if(("${MP_TARGET}" STREQUAL "hw_emu") OR ("${MP_TARGET}" STREQUAL "sw_emu"))
     add_custom_target(link DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/emconfig.json" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin")
 else()
     add_custom_target(link DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin")
