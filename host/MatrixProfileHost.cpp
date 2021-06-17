@@ -79,9 +79,6 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
         kernel.ExecuteTask()
     };
 
-    // TODO: Remove
-    const data_t value = aggregate_init;
-
     Log<LogLevel::Info>("Kernel completed successfully in", executionTime);
 
     Log<LogLevel::Verbose>("Copying back result...");
