@@ -227,8 +227,8 @@ set(KERNEL_LINK_COMMAND
 
 if(("${MP_TARGET}" STREQUAL "hw_emu") OR ("${MP_TARGET}" STREQUAL "sw_emu"))
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/emconfig.json"
-                    COMMENT "Generating emconfig.json file for hardware emulation."
-                    COMMAND "$ENV{XILINX_VITIS}/bin/emconfigutil --platform ${MP_PLATFORM}")
+                    COMMENT "Generating emconfig.json file for emulation."
+                    COMMAND $ENV{XILINX_VITIS}/bin/emconfigutil --platform ${MP_PLATFORM})
 endif()
 
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
