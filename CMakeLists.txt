@@ -102,6 +102,8 @@ if(NOT(SKIP_CHECKS))
                             "For further information see: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/settingupvitisenvironment.html\n"
                             "Did you forget to run \"source /opt/xilinx/xrt/setup.sh\"?")
     endif()
+else()
+    message(STATUS "Skipping environment variable checks...")
 endif()
 
 # Set Connectivity Property
