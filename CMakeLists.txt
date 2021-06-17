@@ -46,6 +46,8 @@ set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream2D) [assumpti
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
 option(BUILD_TESTS "Build software tests (google-test)" OFF)
 
+option(SKIP_CHECKS "Skip Environment Variable Checks" OFF)
+
 # check parameter validity
 list(FIND VALID_TARGETS ${MP_TARGET} target_index)
 if(target_index EQUAL -1)
@@ -86,18 +88,20 @@ if(DEFINED ENV{LIBRARY_PATH})
 endif()
 
 # Check that all required Environment Variables are set
-if(NOT(DEFINED ENV{XILINX_VITIS} AND DEFINED ENV{XILINX_VIVADO}))
-    message(FATAL_ERROR "Environment has not been setup correctly!\n"
-                        "XILINX_VITIS and/or XILINX_VIVADO environment variable(s) are not set.\n"
-                        "For further information see: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/settingupvitisenvironment.html\n"
-                        "Did you forget to run \"source <Vitis_install_path>/settings64.sh\"?")
-endif()
+if(NOT(SKIP_CHECKS))
+    if(NOT(DEFINED ENV{XILINX_VITIS} AND DEFINED ENV{XILINX_VIVADO}))
+        message(FATAL_ERROR "Environment has not been setup correctly!\n"
+                            "XILINX_VITIS and/or XILINX_VIVADO environment variable(s) are not set.\n"
+                            "For further information see: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/settingupvitisenvironment.html\n"
+                            "Did you forget to run \"source <Vitis_install_path>/settings64.sh\"?")
+    endif()
 
-if(NOT((DEFINED ENV{XILINX_XRT} AND DEFINED ENV{LD_LIBRARY_PATH}) AND DEFINED ENV{PYTHONPATH}))
-    message(FATAL_ERROR "Environment has not been setup correctly!\n"
-                        "XILINX_XRT and/or LD_LIBRARY_PATH and/or PYTHONPATH environment variable(s) are not set.\n"
-                        "For further information see: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/settingupvitisenvironment.html\n"
-                        "Did you forget to run \"source /opt/xilinx/xrt/setup.sh\"?")
+    if(NOT((DEFINED ENV{XILINX_XRT} AND DEFINED ENV{LD_LIBRARY_PATH}) AND DEFINED ENV{PYTHONPATH}))
+        message(FATAL_ERROR "Environment has not been setup correctly!\n"
+                            "XILINX_XRT and/or LD_LIBRARY_PATH and/or PYTHONPATH environment variable(s) are not set.\n"
+                            "For further information see: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/settingupvitisenvironment.html\n"
+                            "Did you forget to run \"source /opt/xilinx/xrt/setup.sh\"?")
+    endif()
 endif()
 
 # Set Connectivity Property
