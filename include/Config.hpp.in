@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <ap_fixed.h>
 
+#include "AggregateTypeTraits.hpp"
+
 // Arbitrary Precision Fixed-Point Data Type - Definitions
 // For More Information visit https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/use_arbitrary_precision_data_type.html
 
@@ -55,47 +57,11 @@ static constexpr index_t t = ${MP_SIZE_T};
 // length of the resulting matrix profile (index)
 static constexpr index_t sublen = n - m + 1;
 
-namespace MatrixProfileConfig {
-    
-    template<int W, int I> 
-    constexpr ap_fixed<W, I, AP_RND_ZERO, AP_WRAP_SM> ninfty() {
-        return -((1LL << (I-1)));
-    }
-
-    template<typename T>
-    static const T AggregateInit();
-
-    template<>
-    const double AggregateInit() { return -1e12; }
-
-    template<>
-    const float AggregateInit() { return -1e12; }
-
-    template<>
-    const ap16_t AggregateInit() { return ninfty<16, 5>(); }
-
-    template<>
-    const ap24_t AggregateInit() { return ninfty<24, 8>(); }
-
-    template<>
-    const ap32_t AggregateInit() { return ninfty<32, 11>(); }
-
-    template<>
-    const ap64_t AggregateInit() { return ninfty<64, 14>(); }
-
-    template<typename T>
-    static const T IndexInit();
-
-    template<>
-    const int IndexInit() { return -1; }
-
-}
-
 // "negative infinity" used to initialize aggregates
-static const data_t aggregate_init = MatrixProfileConfig::AggregateInit<data_t>();
+static const data_t aggregate_init = AggregateInit<data_t>::value;
 
 // used to indicate an invalid/undetermined index
-static const index_t index_init = MatrixProfileConfig::IndexInit<index_t>();
+static const index_t index_init = IndexInit<index_t>::value;
 
 // "translate" the selected kernel implementation (type) to a readable string
 #define KERNEL_IMPL_NAME "v${MP_KERNEL}"
