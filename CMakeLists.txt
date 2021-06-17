@@ -224,6 +224,13 @@ add_custom_target(compile DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKerne
 set(KERNEL_LINK_COMMAND
     --link --config "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg" --config "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 
+
+if("${MP_TARGET}" STREQUAL "hw_emu")
+    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/emconfig.json"
+                    COMMENT "Generating emconfig.json file for hardware emulation."
+                    COMMAND "$ENV{XILINX_VITIS}/bin/emconfigutil --platform ${MP_PLATFORM}")
+endif()
+
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
                    COMMENT "Linking ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
                    COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
@@ -231,7 +238,11 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbi
                            "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
                            "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 
-add_custom_target(link DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin")
+if("${MP_TARGET}" STREQUAL "hw_emu")
+    add_custom_target(link DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/emconfig.json" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin")
+else()
+    add_custom_target(link DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin")
+endif()
 
 # Packaging (SD-Card) Only Relevant for Embedded Platforms
 if(MP_EMBEDDED)
