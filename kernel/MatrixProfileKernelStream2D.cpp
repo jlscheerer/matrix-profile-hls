@@ -559,7 +559,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         RowReductionUnit(y, rRow[y], rCol[y], rowAggregate[endIndex], columnAggregate[endIndex], rRow[y + 1], rCol[y + 1]);
     }
     #else
-        #include "Stream2DInit.hpp"
+        #include "kernel/Stream2DInit.hpp"
     #endif
 
     StreamToMemory(rRow[nTiles], rCol[nTiles], MP, MPI);
