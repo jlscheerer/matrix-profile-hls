@@ -44,7 +44,7 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     // cwd: /media/sd-mmcblk0p1
     // Load Input File Containing Time Series Data into Host Memory
     Log<LogLevel::Verbose>("Loading input time series...");
-    if(!FileIO::ReadBinaryFile("data/binary/" + input + ".tsb", host_T))
+    if(!FileIO::ReadBinaryFile(input, host_T))
         return EXIT_FAILURE;
 
     Log<LogLevel::Verbose>("Initializing OpenCL context...");
