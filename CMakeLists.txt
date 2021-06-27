@@ -109,8 +109,10 @@ endif()
 # Set Connectivity Property
 if(MP_EMBEDDED)
     set(CONNECTIVITY_SP "HP")
+    set(MP_EMBEDDED_BOOL 1)
 else()
     set(CONNECTIVITY_SP "bank")
+    set(MP_EMBEDDED_BOOL 0)
 endif()
 
 # Create the configuration file
