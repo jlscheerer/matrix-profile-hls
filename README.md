@@ -1,8 +1,15 @@
-# Matrix Profile Computation on FPGA
+# Matrix Profile Computation on Xilinx FPGAs [![BSD3 License](https://img.shields.io/badge/License-BSDv3-blue.svg)](LICENSE.md) [![Build Status](https://travis-ci.com/jlscheerer/matrix-profile-hls.svg?token=dmssrYE2KgMinUZ9Pecp&branch=master)](https://travis-ci.com/jlscheerer/matrix-profile-hls)
 
-[![Build Status](https://travis-ci.com/jlscheerer/matrix-profile-hls.svg?token=dmssrYE2KgMinUZ9Pecp&branch=master)](https://travis-ci.com/jlscheerer/matrix-profile-hls)
-[![Xilinx Vitis](https://img.shields.io/badge/Powered%20by-Xilinx%20Vitis-orange.svg)](https://www.xilinx.com/products/design-tools/vitis/vitis-platform.html)
-[![BSD3 License](https://img.shields.io/badge/License-BSDv3-blue.svg)](LICENSE.md)
+## Getting Started
+### Cloning the repository
+This project uses Google's open source testing and mocking framework [GoogleTest](https://github.com/google/googletest) to test the different kernels in software.
+
+Since GoogleTest is included as a submodule, make sure to to clone the repository with ``--recursive`` if you plan on running the (software) tests.
+
+If the repository was cloned non-recursively previously, use ``git submodule update --init`` to clone the GoogleTest.
+
+### Prerequisites
+To build and run the kernels in hardware (simulation) [Xilinx Vitis](https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/vitis/2020-2.html) must be installed and the corresponding ``PATH``-variables must be set.
 
 ### Configuration and Building
 ```bash
@@ -29,6 +36,9 @@ export XILINX_XRT=/usr
 export XILINX_VITIS=/mnt
 ```
 > Source: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/runemulation1.html
+
+## Bugs
+If you experience bugs, or have suggestions for improvements, please use the issue tracker to report them.
 
 ### Running
 ```bash
