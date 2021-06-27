@@ -23,6 +23,8 @@
 
 #include <CL/cl2.hpp>
 
+#include "Config.hpp"
+
 #include "host/Timer.hpp"
 #include "host/Logger.hpp"
 
@@ -107,7 +109,7 @@ namespace OpenCL{
                 cl_int errorCode; cl_mem_flags flags = AccessToFlag();
 
                 // See: https://www.xilinx.com/support/documentation/sw_manuals/xilinx2018_2_xdf/ug1277-sdaccel-programmers-guide.pdf (Page 20)
-                if(memoryBank != MemoryBank::Unspecified){
+                if(memoryBank != MemoryBank::Unspecified && !target_embedded){
                     extendedPointer = CreateExtendedMemoryPointer(memoryBank);
                     m_buffer = cl::Buffer(context.context(), flags | CL_MEM_EXT_PTR_XILINX, m_size * sizeof(T), &extendedPointer, &errorCode);
                 }else{
