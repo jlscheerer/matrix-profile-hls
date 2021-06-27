@@ -36,11 +36,12 @@ static const data_t aggregate_init = AggregateInit<data_t>::value;
 // used to indicate an invalid/undetermined index
 static const index_t index_init = IndexInit<index_t>::value;
 
+static constexpr bool target_embedded = ${MP_EMBEDDED_BOOL};
+
 // "translate" the selected kernel implementation (type) to a readable string
 #define KERNEL_IMPL_NAME "v${MP_KERNEL}"
 #define KERNEL_IMPL_INDEX ${kernel_index}
 
 #define DATA_TYPE_NAME "${MP_DATA_TYPE}"
 #define INDEX_TYPE_NAME "${MP_INDEX_TYPE}"
-
 #define TARGET_TYPE_NAME "${MP_TARGET}"

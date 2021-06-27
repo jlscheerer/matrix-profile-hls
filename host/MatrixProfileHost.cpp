@@ -24,7 +24,9 @@
 using tl::optional;
 using Logger::Log;
 using Logger::LogLevel;
+
 using OpenCL::Access;
+using OpenCL::MemoryBank;
 
 /**
  * TODO: Comment for this function
@@ -54,13 +56,13 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     // objects can be used to reference the memory locations on the device.
     Log<LogLevel::Verbose>("Initializing Memory...");
     OpenCL::Buffer<data_t, Access::ReadOnly> buffer_T{
-        context.MakeBuffer<data_t, Access::ReadOnly>(n)
+        context.MakeBuffer<data_t, Access::ReadOnly>(MemoryBank::MemoryBank0, n)
     };
     OpenCL::Buffer<data_t, Access::WriteOnly> buffer_MP{
-        context.MakeBuffer<data_t, Access::WriteOnly>(sublen)
+        context.MakeBuffer<data_t, Access::WriteOnly>(MemoryBank::MemoryBank0, sublen)
     };
     OpenCL::Buffer<index_t, Access::WriteOnly> buffer_MPI{
-        context.MakeBuffer<index_t, Access::WriteOnly>(sublen)
+        context.MakeBuffer<index_t, Access::WriteOnly>(MemoryBank::MemoryBank1, sublen)
     };
 
     Log<LogLevel::Verbose>("Programming device...");
