@@ -11,6 +11,7 @@ If the repository was cloned non-recursively previously, use ``git submodule upd
 ### Prerequisites
 To build and run the kernels in hardware (simulation) [Xilinx Vitis](https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/vitis/2020-2.html) must be installed and the corresponding ``PATH``-variables must be set.
 
+## Build and Run
 ### Configuration and Building
 ```bash
 mkdir build && cd build
@@ -26,6 +27,12 @@ make package_sd
 make launch_emulator
 ```
 
+### Running
+```bash
+./MatrixProfileHost -b MatrixProfileKernel.xclbin -i small8_syn --verbose
+```
+A list of example datasets can be found [here](data/).
+
 ### Configure Environment Variables for Emulator
 ```bash
 mount /dev/mmcblk0p1 /mnt
@@ -37,12 +44,7 @@ export XILINX_VITIS=/mnt
 ```
 > Source: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/runemulation1.html
 
+## Testing
+
 ## Bugs
 If you experience bugs, or have suggestions for improvements, please use the issue tracker to report them.
-
-### Running
-```bash
-./MatrixProfileHost -b MatrixProfileKernel.xclbin -i small8_syn --verbose
-```
-
-> Data-Set Source: https://github.com/matrix-profile-foundation/mpf-datasets
