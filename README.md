@@ -45,5 +45,14 @@ export XILINX_VITIS=/mnt
 ## Testing
 This project uses Google's open source testing and mocking framework [GoogleTest](https://github.com/google/googletest) to test the different kernels in software.
 
+To build and run the test executables:
+```bash
+mkdir build && cd build
+cmake .. -DSKIP_CHECKS=ON -DBUILD_TESTS=ON
+make && make test
+```
+
+The corresponding source files can be found under ``test/TestStreamlessKernel.cpp``, ``test/TestStream1DKernel.cpp`` and ``test/TestStream2DKernel.cpp``
+
 ## Bugs
 If you experience bugs, or have suggestions for improvements, please use the issue tracker to report them.
