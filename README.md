@@ -6,7 +6,7 @@ The Matrix Profile is a novel data structure with corresponding algorithms (stom
 
 The source files for the different implementation of the compute kernel can be found under [``kernel/MatrixProfileKernelStreamless.cpp``](kernel/MatrixProfileKernelStreamless.cpp), [``kernel/MatrixProfileKernelStream1D.cpp``](kernel/MatrixProfileKernelStream1D.cpp) and [``kernel/MatrixProfileKernelStream2D.cpp``](kernel/MatrixProfileKernelStream2D.cpp).
 
-The host application is in [``host/MatrixProfileHost.cpp``](host/MatrixProfileHost.cpp)
+The host application is in [``host/MatrixProfileHost.cpp``](host/MatrixProfileHost.cpp). This repository contains a light-weight OpenCL™ wrapper for the interaction with the FPGA kernel, which is located in [``include/host/OpenCL.hpp``](include/host/OpenCL.hpp).
 
 ## Getting Started
 ### Cloning the repository
