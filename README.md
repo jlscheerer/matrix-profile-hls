@@ -1,5 +1,13 @@
 # Matrix Profile Computation on Xilinx FPGAs [![BSD3 License](https://img.shields.io/badge/License-BSDv3-blue.svg)](LICENSE.md) [![Build Status](https://travis-ci.com/jlscheerer/matrix-profile-hls.svg?token=dmssrYE2KgMinUZ9Pecp&branch=master)](https://travis-ci.com/jlscheerer/matrix-profile-hls)
 
+This repository includes multiple pure Vitis™ HLS implementations of the Matrix Profile Computation Algorithm [SCAMP](https://github.com/zpzim/SCAMP) for Xilinx FPGAs, using Xilinx Vitis™ to instantiate memory and PCIe controllers and interface with the host.
+
+The Matrix Profile is a novel data structure with corresponding algorithms (stomp, regimes, motifs, etc.) developed by the [Keogh](https://www.cs.ucr.edu/~eamonn/MatrixProfile.html) and [Mueen](https://www.cs.unm.edu/~mueen/) research groups at UC-Riverside and the University of New Mexico. 
+
+The source files for the different implementation of the compute kernel can be found under [``kernel/MatrixProfileKernelStreamless.cpp``](kernel/MatrixProfileKernelStreamless.cpp), [``kernel/MatrixProfileKernelStream1D.cpp``](kernel/MatrixProfileKernelStream1D.cpp) and [``kernel/MatrixProfileKernelStream2D.cpp``](kernel/MatrixProfileKernelStream2D.cpp).
+
+The host application is in [``host/MatrixProfileHost.cpp``](host/MatrixProfileHost.cpp)
+
 ## Getting Started
 ### Cloning the repository
 This project uses Google's open source testing and mocking framework [GoogleTest](https://github.com/google/googletest) to test the different kernels in software.
@@ -41,11 +49,6 @@ export XILINX_XRT=/usr
 export XILINX_VITIS=/mnt
 ```
 > Source: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/runemulation1.html
-
-## Implementation
-
-### Kernel Overview
-![Kernel Implementations](ressources/Kernel-Implementations.png "Logo Title Text 1")
 
 ## Testing
 This project uses Google's open source testing and mocking framework [GoogleTest](https://github.com/google/googletest) to test the different kernels in software.
