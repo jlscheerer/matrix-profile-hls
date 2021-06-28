@@ -45,7 +45,7 @@ export XILINX_VITIS=/mnt
 ## Implementation
 
 ### Kernel Overview
-
+![Kernel Implementations](ressources/Kernel-Implementations.png "Logo Title Text 1")
 
 ## Testing
 This project uses Google's open source testing and mocking framework [GoogleTest](https://github.com/google/googletest) to test the different kernels in software.
