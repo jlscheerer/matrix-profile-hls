@@ -45,7 +45,7 @@ make link
 | ``MP_TARGET``       | Compilation Target        | ``sw_emu``, ``hw_emu``, ``hw``                                        |
 | ``DMP_SIZE_N``      | Length of the Time Series |                                                                       |
 | ``DMP_SIZE_M``      | Subsequence Length        |                                                                       |
-| ``DMP_SIZE_T``      | Tile-Size                 | *only for Stream2D-Kernel*                                            |
+| ``DMP_SIZE_T``      | Tile-Size                 | *only applicable for Stream2D-Kernel*                                 |
 
 For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platforms) reference [``CMakeLists.txt``](CMakeLists.txt).
 

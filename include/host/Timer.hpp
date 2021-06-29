@@ -38,7 +38,7 @@ std::ostream& operator<<(std::ostream& os, std::chrono::nanoseconds ns){
         os << std::setw(h.count() ? 2 : 1) << m.count() << "m ";
     if (h.count() || m.count() || s.count())
         os << std::setw(h.count() || m.count() ? 2 : 1) << s.count() << "s ";
-    os << std::setw(h.count() || m.count() || s.count() ? 3 : 1) << ms.count() << "ms";
+    os << std::setw(h.count() || m.count() || s.count() ? 3 : 1) << ms.count() << "ms (" << ns.count() << " ns)";
 
     os.fill(fill);
     return os;
