@@ -51,22 +51,12 @@ For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platfo
 
 Per default the build targets the Alveo U250 acceleration board, but this can be configured using the ``MP_PLATFORM`` CMake parameter.
 
-### Running
+### Executing the Kernel
+After having ``build`` the host application and `link`ed the Kernel, execute the Kernel on input [``data/binary/small128_syn.tsb``](data/binary/small128_syn.tsb) (run this in the ``build`` directory).
 ```bash
-./MatrixProfileHost -b MatrixProfileKernel.xclbin -i small8_syn --verbose
+./MatrixProfileHost -b MatrixProfileKernel.xclbin -i ../data/binary/small128_syn.tsb --verbose
 ```
 A list of example datasets as well as instruction on how to use your own dataset can be found [here](data/).
-
-### Configure Environment Variables for Emulator
-```bash
-mount /dev/mmcblk0p1 /mnt
-cd /mnt
-export LD_LIBRARY_PATH=/mnt:/tmp:$LD_LIBRARY_PATH
-export XCL_EMULATION_MODE=hw_emu
-export XILINX_XRT=/usr
-export XILINX_VITIS=/mnt
-```
-> Source: https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/runemulation1.html
 
 ## Testing
 This project uses Google's open source testing and mocking framework [GoogleTest](https://github.com/google/googletest) to test the different kernels in software.
