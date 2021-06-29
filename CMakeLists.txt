@@ -154,14 +154,14 @@ if("${MP_KERNEL}" STREQUAL "Stream2D")
     foreach(y RANGE "${nTiles_1}")
         index2D(${y} ${y})
         MATH(EXPR y_1 "${y} + 1")
-        set(Stream2DInitSource "${Stream2DInitSource}ScatterLaneStreamingUnit(${y}, ${y}, sT[${y}], sMu[${y}], sDf[${y}], sDg[${y}], sInv[${y}], Ti[${index}], Tj[${index}], 
+        set(Stream2DInitSource "${Stream2DInitSource}PrimaryDiagonalComputeElement(${y}, ${y}, sT[${y}], sMu[${y}], sDf[${y}], sDg[${y}], sInv[${y}], Ti[${index}], Tj[${index}], 
                         mui[${index}], muj[${index}], dfi[${index}], dfj[${index}], dgi[${index}], dgj[${index}], invi[${index}], invj[${index}], 
                         rowAggregate[${index}], columnAggregate[${index}], sT[${y_1}], sMu[${y_1}], sDf[${y_1}], sDg[${y_1}], sInv[${y_1}]);\n\n")
         if(NOT (${nTiles_1} LESS ${y_1}))
             foreach(x RANGE ${y_1} ${nTiles_1})
                 index2D(${x} ${y})
                 MATH(EXPR index_1 "${index} - 1")
-                set(Stream2DInitSource "${Stream2DInitSource}RowLaneStreamingUnit(${y}, ${x}, Ti[${index_1}], Tj[${index_1}], mui[${index_1}], muj[${index_1}],
+                set(Stream2DInitSource "${Stream2DInitSource}DiagonalComputeElement(${y}, ${x}, Ti[${index_1}], Tj[${index_1}], mui[${index_1}], muj[${index_1}],
                             dfi[${index_1}], dfj[${index_1}], dgi[${index_1}], dgj[${index_1}], invi[${index_1}],
                             invj[${index_1}], rowAggregate[${index_1}], columnAggregate[${index_1}], Ti[${index}],
                             Tj[${index}], mui[${index}], muj[${index}], dfi[${index}], dfj[${index}], dgi[${index}], dgj[${index}], 
@@ -170,7 +170,7 @@ if("${MP_KERNEL}" STREQUAL "Stream2D")
         endif()
 
         index2D(${nTiles_1} ${y})
-        set(Stream2DInitSource "${Stream2DInitSource}RowReductionUnit(${y}, rRow[${y}], rCol[${y}], rowAggregate[${index}], columnAggregate[${index}], rRow[${y_1}], rCol[${y_1}]);\n\n")
+        set(Stream2DInitSource "${Stream2DInitSource}ReductionElement(${y}, rRow[${y}], rCol[${y}], rowAggregate[${index}], columnAggregate[${index}], rRow[${y_1}], rCol[${y_1}]);\n\n")
     endforeach()
     # Write Generated Code to File (will be included in the Stream2D)
     configure_file(include/kernel/Stream2DInit.hpp.in kernel/Stream2DInit.hpp)

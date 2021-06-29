@@ -26,7 +26,7 @@ static constexpr index_t max(const index_t a, const index_t b){ return (a > b) ?
 // https://math.stackexchange.com/questions/2134011/conversion-of-upper-triangle-linear-index-from-index-on-symmetrical-array
 static constexpr index_t index2D(const index_t x, const index_t y) { return (nTiles * (nTiles - 1)) / 2 - ((nTiles - y) * (nTiles - y - 1)) / 2 + x; }
 
-void MemoryToStream(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t, stream_d> &sMu,
+void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &sT, stream<data_t, stream_d> &sMu,
                     stream<data_t, stream_d> &sDf, stream<data_t, stream_d> &sDg, stream<data_t, stream_d> &sInv) {
     // store the previous (m-1) T-values in local "cache" (acts as shift-register)
     data_t T_m[m];
@@ -183,7 +183,7 @@ void MatrixProfileComputeUnit(index_t yStage, index_t xStage, data_t (&Ti_m)[m],
 
 }
 
-void ScatterLaneStreamingUnit(index_t yStage, index_t xStage, stream<data_t, stream_d> &sT_in,
+void PrimaryDiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, stream_d> &sT_in,
         stream<data_t, stream_d> &sMu_in, stream<data_t, stream_d> &sDf_in, stream<data_t, stream_d> &sDg_in, stream<data_t, stream_d> &sInv_in,
 
         stream<data_t, stream_d> &Ti_out, stream<data_t, stream_d> &Tj_out, stream<data_t, stream_d> &mui_out, stream<data_t, stream_d> &muj_out,
@@ -313,7 +313,7 @@ void ScatterLaneStreamingUnit(index_t yStage, index_t xStage, stream<data_t, str
     // =============== [/Reduce] ===============
 }
 
-void RowLaneStreamingUnit(index_t yStage, index_t xStage, stream<data_t, stream_d> &Ti_in,
+void DiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, stream_d> &Ti_in,
         stream<data_t, stream_d> &Tj_in, stream<data_t, stream_d> &mui_in, stream<data_t, stream_d> &muj_in, stream<data_t, stream_d> &dfi_in,
         stream<data_t, stream_d> &dfj_in, stream<data_t, stream_d> &dgi_in, stream<data_t, stream_d> &dgj_in, stream<data_t, stream_d> &invi_in,
         stream<data_t, stream_d> &invj_in,
@@ -455,7 +455,7 @@ void RowLaneStreamingUnit(index_t yStage, index_t xStage, stream<data_t, stream_
     // =============== [/Reduce] ===============
 }
 
-void RowReductionUnit(index_t yStage, stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in,
+void ReductionElement(index_t yStage, stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in,
                       stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in,
                       stream<aggregate_t, stream_d> &rRow_out, stream<aggregate_t, stream_d> &rCol_out) {
     // forward row aggregates
@@ -488,7 +488,7 @@ data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
-void StreamToMemory(stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in, data_t *MP, index_t *MPI) {
+void StreamToMemoryElement(stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in, data_t *MP, index_t *MPI) {
     // local "cache" storing the row aggregates (to merge them later)
     aggregate_t aggregates_m[n - m + 1];
 
@@ -532,13 +532,13 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     // Streams for the Reduction Lane
     stream<aggregate_t, stream_d> rRow[nTiles + 1], rCol[nTiles + 1];
 
-    MemoryToStream(T, sT[0], sMu[0], sDf[0], sDg[0], sInv[0]);
+    MemoryToStreamElement(T, sT[0], sMu[0], sDf[0], sDg[0], sInv[0]);
 
     #ifdef TEST_MOCK_SW
     for (index_t y = 0; y < nTiles; ++y) {
         #pragma HLS UNROLL
         const index_t beginIndex = index2D(y, y);
-        ScatterLaneStreamingUnit(y, y, sT[y], sMu[y], sDf[y], sDg[y], sInv[y], Ti[beginIndex], Tj[beginIndex],
+        PrimaryDiagonalComputeElement(y, y, sT[y], sMu[y], sDf[y], sDg[y], sInv[y], Ti[beginIndex], Tj[beginIndex],
                 mui[beginIndex], muj[beginIndex], dfi[beginIndex], dfj[beginIndex], dgi[beginIndex],
                 dgj[beginIndex], invi[beginIndex], invj[beginIndex], rowAggregate[beginIndex], columnAggregate[beginIndex],
                 sT[y + 1], sMu[y + 1], sDf[y + 1], sDg[y + 1], sInv[y + 1]);
@@ -546,18 +546,18 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         for (index_t x = y + 1; x < nTiles; ++x) {
             #pragma HLS UNROLL
             index_t index = index2D(x, y);
-            RowLaneStreamingUnit(y, x, Ti[index - 1], Tj[index - 1], mui[index - 1], muj[index - 1],
+            DiagonalComputeElement(y, x, Ti[index - 1], Tj[index - 1], mui[index - 1], muj[index - 1],
                     dfi[index - 1], dfj[index - 1], dgi[index - 1], dgj[index - 1], invi[index - 1],
                     invj[index - 1], rowAggregate[index - 1], columnAggregate[index - 1], Ti[index],
                     Tj[index], mui[index], muj[index], dfi[index], dfj[index], dgi[index], dgj[index], 
                     invi[index], invj[index], rowAggregate[index], columnAggregate[index]);
         }
         const index_t endIndex = index2D(nTiles - 1, y);
-        RowReductionUnit(y, rRow[y], rCol[y], rowAggregate[endIndex], columnAggregate[endIndex], rRow[y + 1], rCol[y + 1]);
+        ReductionElement(y, rRow[y], rCol[y], rowAggregate[endIndex], columnAggregate[endIndex], rRow[y + 1], rCol[y + 1]);
     }
     #else
         #include "kernel/Stream2DInit.hpp"
     #endif
 
-    StreamToMemory(rRow[nTiles], rCol[nTiles], MP, MPI);
+    StreamToMemoryElement(rRow[nTiles], rCol[nTiles], MP, MPI);
 }
