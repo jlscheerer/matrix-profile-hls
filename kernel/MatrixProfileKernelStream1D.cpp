@@ -16,7 +16,7 @@
 
 static constexpr size_t stream_d = 3;
 
-void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t, stream_d> &df_i, stream<data_t, stream_d> &df_j,
+void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t, stream_d> &df_i, stream<data_t, stream_d> &df_j,
                     stream<data_t, stream_d> &dg_i, stream<data_t, stream_d> &dg_j, stream<data_t, stream_d> &inv_i,
                     stream<data_t, stream_d> &inv_j, stream<aggregate_t, stream_d> &rowAggregate, stream<aggregate_t, stream_d> &columnAggregate) {
     // store the previous (m-1) T-values in local "cache" (acts as shift-register)
@@ -118,7 +118,7 @@ void MemoryToStream(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t
 }
 
 // TODO: Potentially Template this function to avoid unnecessary memory/ressource consumption of "caches"
-void MatrixProfileComputationElement(const index_t stage, stream<data_t, stream_d> &QT_in, stream<data_t, stream_d> &df_i_in, stream<data_t, stream_d> &df_j_in, 
+void DiagonalComputeElement(const index_t stage, stream<data_t, stream_d> &QT_in, stream<data_t, stream_d> &df_i_in, stream<data_t, stream_d> &df_j_in, 
                                      stream<data_t, stream_d> &dg_i_in, stream<data_t, stream_d> &dg_j_in, stream<data_t, stream_d> &inv_i_in, stream<data_t, stream_d> &inv_j_in, 
                                      stream<aggregate_t, stream_d> &rowAggregate_in, stream<aggregate_t, stream_d> &columnAggregate_in, stream<data_t, stream_d> &QT_out,
                                      stream<data_t, stream_d> &df_i_out, stream<data_t, stream_d> &df_j_out, stream<data_t, stream_d> &dg_i_out, stream<data_t, stream_d> &dg_j_out,
@@ -207,7 +207,7 @@ data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
-void StreamToMemory(stream<aggregate_t, stream_d> &rowAggregates, stream<aggregate_t, stream_d> &columnAggregates, data_t *MP, index_t *MPI) {
+void StreamToMemoryElement(stream<aggregate_t, stream_d> &rowAggregates, stream<aggregate_t, stream_d> &columnAggregates, data_t *MP, index_t *MPI) {
     // TODO: Add Comment(s)
     StreamToMemoryReduce:
     for (index_t k = 0; k < n - m + 1; ++k) {
@@ -238,15 +238,15 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     // Store the intermediate results
     stream<aggregate_t, stream_d> rowAggregate[numStages + 1], columnAggregate[numStages + 1];
 
-    MemoryToStream(T, QT[0], df_i[0], df_j[0], dg_i[0], dg_j[0], inv_i[0], inv_j[0], rowAggregate[0], columnAggregate[0]);
+    MemoryToStreamElement(T, QT[0], df_i[0], df_j[0], dg_i[0], dg_j[0], inv_i[0], inv_j[0], rowAggregate[0], columnAggregate[0]);
 
     for (index_t stage = 0; stage < numStages; ++stage) {
         #pragma HLS UNROLL
-        MatrixProfileComputationElement(stage, QT[stage], df_i[stage], df_j[stage], dg_i[stage], dg_j[stage],
+        DiagonalComputeElement(stage, QT[stage], df_i[stage], df_j[stage], dg_i[stage], dg_j[stage],
                                         inv_i[stage], inv_j[stage], rowAggregate[stage], columnAggregate[stage], QT[stage + 1],
                                         df_i[stage + 1], df_j[stage + 1], dg_i[stage + 1], dg_j[stage + 1], inv_i[stage + 1],
                                         inv_j[stage + 1], rowAggregate[stage + 1], columnAggregate[stage + 1]);
     }
 
-    StreamToMemory(rowAggregate[numStages], columnAggregate[numStages], MP, MPI);
+    StreamToMemoryElement(rowAggregate[numStages], columnAggregate[numStages], MP, MPI);
 }

@@ -11,7 +11,7 @@
     #include "hls_math.h"
 #endif
 
-void PrecomputationProcessingElement(const data_t *T, data_t (&mu)[sublen], data_t (&df)[sublen], data_t (&dg)[sublen], data_t (&inv)[sublen], 
+void PrecomputationElement(const data_t *T, data_t (&mu)[sublen], data_t (&df)[sublen], data_t (&dg)[sublen], data_t (&inv)[sublen], 
                                      data_t (&QT)[sublen], data_t (&P)[sublen], aggregate_t (&rowAggregate)[sublen], aggregate_t (&columnAggregate)[sublen]) {
     #pragma HLS INLINE
     // use T_m as shift register containing the previous m T elements
@@ -127,7 +127,7 @@ data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     return sqrt(2 * m * (1 - PearsonCorrelation));
 }
 
-void ReductionComputionElement(aggregate_t (&rowAggregate)[sublen], aggregate_t (&columnAggregate)[sublen], data_t *MP, index_t *MPI) {
+void ReductionElement(aggregate_t (&rowAggregate)[sublen], aggregate_t (&columnAggregate)[sublen], data_t *MP, index_t *MPI) {
     #pragma HLS INLINE
     // Just always take the max
     ReductionCompute:
@@ -152,7 +152,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     // factor=3 required for fadd and fmul (update if data_t changes)
     #pragma HLS ARRAY_PARTITION variable=columnAggregate      cyclic factor=3
 
-    PrecomputationProcessingElement(T, mu, df, dg, inv, QT, P, rowAggregate, columnAggregate);
+    PrecomputationElement(T, mu, df, dg, inv, QT, P, rowAggregate, columnAggregate);
 
     // Do the actual calculations via updates
     MatrixProfileComputeRow:
@@ -185,5 +185,5 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         rowAggregate[row] = rowAggregate_m;
     }
     
-    ReductionComputionElement(rowAggregate, columnAggregate, MP, MPI);
+    ReductionElement(rowAggregate, columnAggregate, MP, MPI);
 }
