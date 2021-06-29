@@ -15,23 +15,41 @@ This project uses Google's open source testing and mocking framework [GoogleTest
 Since GoogleTest is included as a submodule, make sure to to clone the repository with ``--recursive`` if you plan on running the (software) tests. If the repository was cloned non-recursively previously, use ``git submodule update --init`` to clone the required submodule (GoogleTest).
 
 ### Prerequisites
-To build and run the kernels in hardware (simulation) [Xilinx Vitis](https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/vitis/2020-2.html) must be installed and the corresponding ``PATH``-variables must be set.
-
+To build and run the kernels in hardware (simulation) [Xilinx Vitis](https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/vitis/2020-2.html) must be installed and the corresponding ``PATH``-variables must be set. In particular, this typically requires [setting up the environment to run the Vitis™ software platform](https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/settingupvitisenvironment.html):
+```bash
+source /opt/Xilinx/Vitis/2020.2/settings64.sh
+source /opt/xilinx/xrt/setup.sh
+```
+and setting the correct ``XCL_EMULATION_MODE`` in case of software (``sw_emu``) or hardware (``hw_emu``) emulation:
+```bash
+export XCL_EMULATION_MODE=hw_emu
+```
 ## Build and Run
 ### Configuration and Building
-```bashs
+This project is configured and built using CMake. Most parameters must be set at configuration-time, as they are used to specialize the hardware.
+
+An example of configuring the kernel (starting from the ``root`` directory):
+
+```bash
 mkdir build && cd build
-cmake ..
+cmake .. -DMP_KERNEL=Stream2D -MP_DATA_TYPE=double -DMP_SIZE_N=1024 -DMP_SIZE_M=64 -DMP_SIZE_T=256
 make host
 make compile
 make link
-make package_sd
 ```
 
-### Launch the Emulator
-```bash
-make launch_emulator
-```
+| **CMake Parameter** | **Description**           | **Values**                                                            |
+|---------------------|---------------------------|-----------------------------------------------------------------------|
+| ``MP_KERNEL``       | Kernel-Implementation     | ``Streamless``, ``Stream1D``, ``Stream2D``                            |
+| ``MP_DATA_TYPE``    | Data Type for Computation | ``double``, ``float``, ``ap16_t``, ``ap24_t``, ``ap32_t``, ``ap64_t`` |
+| ``MP_TARGET``       | Compilation Target        | ``sw_emu``, ``hw_emu``, ``hw``                                        |
+| ``DMP_SIZE_N``      | Length of the Time Series |                                                                       |
+| ``DMP_SIZE_M``      | Subsequence Length        |                                                                       |
+| ``DMP_SIZE_T``      | Tile-Size                 | *only for Stream2D-Kernel*                                            |
+
+For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platforms) reference [``CMakeLists.txt``](CMakeLists.txt).
+
+Per default the build targets the Alveo U250 acceleration board, but this can be configured using the ``MP_PLATFORM`` CMake parameter.
 
 ### Running
 ```bash

@@ -8,10 +8,10 @@ CMAKE_POLICY(SET CMP0057 NEW)
 set(CMAKE_CXX_STANDARD 11)
 
 # Matrix Profile Target Options
-set(MP_PLATFORM "xilinx_zcu102_base_202010_1" CACHE STRING "Platform for Vitis (--platform)")
+set(MP_PLATFORM "xilinx_u250_xdma_201830_2" CACHE STRING "Platform for Vitis (--platform)")
 
 # https://www.xilinx.com/html_docs/xilinx2020_2/vitis_doc/embeddedplatforms.html
-option(MP_EMBEDDED "build for Vitis Embedded Platforms" ON)
+option(MP_EMBEDDED "build for Vitis Embedded Platforms" OFF)
 
 set(VALID_TARGETS sw_emu hw_emu hw)
 set(MP_TARGET "hw_emu" CACHE STRING "compile target: {sw_emu, hw_emu, hw}")
