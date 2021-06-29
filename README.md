@@ -38,6 +38,8 @@ make compile
 make link
 ```
 
+### Build Parameters
+
 | **CMake Parameter** | **Description**           | **Values**                                                            |
 |---------------------|---------------------------|-----------------------------------------------------------------------|
 | ``MP_KERNEL``       | Kernel-Implementation     | ``Streamless``, ``Stream1D``, ``Stream2D``                            |
