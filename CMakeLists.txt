@@ -123,6 +123,8 @@ configure_file(config/common-config.cfg.in config/common-config.cfg)
 configure_file(config/compile-config.cfg.in config/compile-config.cfg)
 configure_file(config/link-config.cfg.in config/link-config.cfg)
 
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/reports/build-info.txt" "MP_PLATFORM=${MP_PLATFORM}\nMP_EMBEDDED=${MP_EMBEDDED}\nMP_TARGET=${MP_TARGET}\nMP_QUICK_BUILD=${MP_QUICK_BUILD}\n\nMP_KERNEL=${MP_KERNEL}\nMP_SIZE_N=${MP_SIZE_N}\nMP_SIZE_M=${MP_SIZE_M}\nMP_SIZE_T=${MP_SIZE_T}\n\nMP_DATA_TYPE=${MP_DATA_TYPE}\nMP_INDEX_TYPE=${MP_INDEX_TYPE}\n")
+
 # Only Generate Platform Configuration for Embedded Platforms
 if(MP_EMBEDDED)
     configure_file(config/package-config.cfg.in config/package-config.cfg)
