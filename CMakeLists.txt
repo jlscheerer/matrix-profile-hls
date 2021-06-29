@@ -227,20 +227,29 @@ set(KERNEL_LINK_COMMAND
     --link --config "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg" --config "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 
 
-if(("${MP_TARGET}" STREQUAL "hw_emu") OR ("${MP_TARGET}" STREQUAL "sw_emu"))
+if(("${MP_TARGET}" STREQUAL "sw_emu") OR ("${MP_TARGET}" STREQUAL "hw_emu"))
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/emconfig.json"
                     COMMENT "Generating emconfig.json file for emulation."
                     COMMAND $ENV{XILINX_VITIS}/bin/emconfigutil --platform ${MP_PLATFORM})
 endif()
 
-add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
-                   COMMENT "Linking ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
-                   COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
-                   POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.build/reports/MatrixProfileKernelTLF/hls_reports/MatrixProfileKernelTLF_csynth.rpt ${CMAKE_CURRENT_BINARY_DIR}/reports/csynth.rpt
-                   POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.build/MatrixProfileKernelTLF/MatrixProfileKernelTLF/vitis_hls.log ${CMAKE_CURRENT_BINARY_DIR}/reports/vitis_hls.log
-                   DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
-                           "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
-                           "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
+if(("${MP_TARGET}" STREQUAL "hw_emu") OR ("${MP_TARGET}" STREQUAL "hw"))
+    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
+                    COMMENT "Linking ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
+                    COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
+                    POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.build/reports/MatrixProfileKernelTLF/hls_reports/MatrixProfileKernelTLF_csynth.rpt ${CMAKE_CURRENT_BINARY_DIR}/reports/csynth.rpt
+                    POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.build/MatrixProfileKernelTLF/MatrixProfileKernelTLF/vitis_hls.log ${CMAKE_CURRENT_BINARY_DIR}/reports/vitis_hls.log
+                    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
+                            "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
+                            "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
+else()
+    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
+                    COMMENT "Linking ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
+                    COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
+                    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
+                            "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
+                            "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
+endif()
 
 if(("${MP_TARGET}" STREQUAL "hw_emu") OR ("${MP_TARGET}" STREQUAL "sw_emu"))
     add_custom_target(link DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/emconfig.json" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin")
