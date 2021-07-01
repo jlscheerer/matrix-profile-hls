@@ -141,15 +141,15 @@ void ReductionElement(aggregate_t (&rowAggregate)[sublen], aggregate_t (&columnA
 }
 
 void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
-    #pragma HLS INTERFACE m_axi     port=T   offset=slave bundle=gmem0
-    #pragma HLS INTERFACE m_axi     port=MP  offset=slave bundle=gmem1
-    #pragma HLS INTERFACE m_axi     port=MPI offset=slave bundle=gmem2
+    #pragma HLS INTERFACE m_axi port=T   offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=MP  offset=slave bundle=gmem1
+    #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem2
 
     data_t mu[sublen], df[sublen], dg[sublen], inv[sublen];
     data_t QT[sublen], P[sublen];
 
     aggregate_t rowAggregate[sublen], columnAggregate[sublen];
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate complete
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=3
 
     PrecomputationElement(T, mu, df, dg, inv, QT, P, rowAggregate, columnAggregate);
 
