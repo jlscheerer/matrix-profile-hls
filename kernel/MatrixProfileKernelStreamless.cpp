@@ -158,8 +158,6 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     MatrixProfileComputeRow:
     for (index_t row = 1; row < sublen; ++row) {
         data_t dfi = df[row]; data_t dgi = dg[row]; data_t invi = inv[row];
-        aggregate_t rowAggregate_m = aggregate_t_init;
-
         // exclusionZone integrated into loop bounds
         // exclusionZone <==> row - m/4 <= column <= row + m/4
         //               <==> column <= row + m/4 [(row <= column, m > 0) ==> row - m/4 <= column]
@@ -177,10 +175,11 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
             // Update Aggregates
             const index_t column = row + k;
-            columnAggregate[column] = (P[k] > columnAggregate[column].value) ? aggregate_t{P[k], static_cast<index_t>(row)} : columnAggregate[column];
-            rowAggregate_m = (P[k] > rowAggregate_m.value) ? aggregate_t{P[k], static_cast<index_t>(column)} : rowAggregate_m;
+            if(P[k] > columnAggregate[column].value)
+                columnAggregate[column] = {P[k], static_cast<index_t>(row)};
+            if(P[k] > rowAggregate[row].value)
+                rowAggregate[row] = {P[k], static_cast<index_t>(column)};
         }
-        rowAggregate[row] = rowAggregate_m;
     }
     
     ReductionElement(rowAggregate, columnAggregate, MP, MPI);
