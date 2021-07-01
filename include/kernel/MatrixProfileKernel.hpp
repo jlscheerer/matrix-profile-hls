@@ -6,11 +6,10 @@
 
 #pragma once
 
-struct aggregate_t {
+typedef struct {
     data_t value;
     index_t index;
-    inline bool operator>(const aggregate_t &rhs) const { return value >  rhs.value; }
-};
+} aggregate_t;
 
 static const aggregate_t aggregate_t_init{aggregate_init, index_init};
 
