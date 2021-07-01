@@ -245,6 +245,7 @@ if(("${MP_TARGET}" STREQUAL "hw_emu") OR ("${MP_TARGET}" STREQUAL "hw"))
                     COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
                     POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.build/reports/MatrixProfileKernelTLF/hls_reports/MatrixProfileKernelTLF_csynth.rpt ${CMAKE_CURRENT_BINARY_DIR}/reports/csynth.rpt
                     POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.build/MatrixProfileKernelTLF/MatrixProfileKernelTLF/vitis_hls.log ${CMAKE_CURRENT_BINARY_DIR}/reports/vitis_hls.log
+                    POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.build/reports/MatrixProfileKernelTLF/system_estimate_MatrixProfileKernelTLF.xtxt ${CMAKE_CURRENT_BINARY_DIR}/reports/system_estimate.xtxt
                     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
                             "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
                             "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
