@@ -23,7 +23,6 @@ namespace MatrixProfileTests {
         struct aggregate_t {
             data_t value;
             index_t index;
-            inline bool operator>(const aggregate_t &rhs) const { return value >  rhs.value; }
         };
 
         #include "MatrixProfileKernelStream1D.cpp"

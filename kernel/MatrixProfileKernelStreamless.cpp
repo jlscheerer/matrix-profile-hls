@@ -11,9 +11,6 @@
     #include "hls_math.h"
 #endif
 
-template<typename T>
-T &max(T &&a, T&b) { return a > b ? a : b; }
-
 void PrecomputationElement(const data_t *T, data_t (&mu)[sublen], data_t (&df)[sublen], data_t (&dg)[sublen], data_t (&inv)[sublen], 
                                      data_t (&QT)[sublen], data_t (&P)[sublen], aggregate_t (&rowAggregate)[sublen], aggregate_t (&columnAggregate)[sublen]) {
     #pragma HLS INLINE
@@ -152,8 +149,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     data_t QT[sublen], P[sublen];
 
     aggregate_t rowAggregate[sublen], columnAggregate[sublen];
-    // factor=3 required for fadd and fmul (update if data_t changes)
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate      cyclic factor=3
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=m
 
     PrecomputationElement(T, mu, df, dg, inv, QT, P, rowAggregate, columnAggregate);
 
@@ -178,8 +174,10 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
             // Update Aggregates
             const index_t column = row + k;
-            columnAggregate[column] = max(aggregate_t{P[k], static_cast<index_t>(row)}, columnAggregate[column]);
-            rowAggregate[row] = max(aggregate_t{P[k], static_cast<index_t>(column)}, rowAggregate[row]);
+            if(P[k] > columnAggregate[column].value)
+                columnAggregate[column] = {P[k], static_cast<index_t>(row)};
+            if(P[k] > rowAggregate[row].value)
+                rowAggregate[row] = {P[k], static_cast<index_t>(column)};
         }
     }
     

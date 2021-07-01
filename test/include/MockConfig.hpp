@@ -30,5 +30,4 @@ static constexpr index_t index_init = IndexInit<index_t>();
 struct aggregate_t {
     data_t value;
     index_t index;
-    inline bool operator>(const aggregate_t &rhs) const { return value >  rhs.value; }
 };
