@@ -6,10 +6,10 @@
 
 #pragma once
 
-typedef struct {
+struct aggregate_t {
     data_t value;
     index_t index;
-} aggregate_t;
+};
 
 static const aggregate_t aggregate_t_init{aggregate_init, index_init};
 

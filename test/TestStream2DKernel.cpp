@@ -20,10 +20,10 @@ namespace MatrixProfileTests {
         // used to indicate an invalid/undetermined index
         static constexpr index_t index_init = IndexInit<index_t>();
 
-        typedef struct {
+        struct aggregate_t {
             data_t value;
             index_t index;
-        } aggregate_t;
+        };
 
         #include "MatrixProfileKernelStream2D.cpp"
     };

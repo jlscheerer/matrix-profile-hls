@@ -149,8 +149,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     data_t QT[sublen], P[sublen];
 
     aggregate_t rowAggregate[sublen], columnAggregate[sublen];
-    // factor=3 required for fadd and fmul (update if data_t changes)
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate      cyclic factor=3
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=m
 
     PrecomputationElement(T, mu, df, dg, inv, QT, P, rowAggregate, columnAggregate);
 
