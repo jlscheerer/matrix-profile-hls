@@ -99,7 +99,7 @@ void PrecomputationElement(const data_t *T, data_t (&mu)[sublen], data_t (&df)[s
         QT[i - m + 1] = qt_sum;
 
         // calculate Pearson Correlation: P_{i, j} = QT_{i, j} * inv_i * inv_j
-        P[i - m + 1] = qt_sum * inv0 * 1 / sqrt(inv_sum);
+        P[i - m + 1] = qt_sum * inv0 * 1 / static_cast<data_t>(sqrt(inv_sum));
 
         rowAggregate[i - m + 1] = aggregate_t_init;
         

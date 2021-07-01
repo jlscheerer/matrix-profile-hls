@@ -5,7 +5,6 @@
  */
 
 #pragma once
-#include <cstdlib>
 
 typedef struct {
     data_t value;
