@@ -177,10 +177,8 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
             // Update Aggregates
             const index_t column = row + k;
-            if(P[k] > columnAggregate[column].value)
-                columnAggregate[column] = {P[k], static_cast<index_t>(row)};
-            if(P[k] > rowAggregate_m.value)
-                rowAggregate_m = {P[k], static_cast<index_t>(column)};
+            columnAggregate[column] = (P[k] > columnAggregate[column].value) ? aggregate_t{P[k], static_cast<index_t>(row)} : columnAggregate[column];
+            rowAggregate_m = (P[k] > rowAggregate_m.value) ? aggregate_t{P[k], static_cast<index_t>(column)} : rowAggregate_m;
         }
         rowAggregate[row] = rowAggregate_m;
     }
