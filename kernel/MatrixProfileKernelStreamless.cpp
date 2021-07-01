@@ -11,6 +11,8 @@
     #include "hls_math.h"
 #endif
 
+static constexpr index_t m2 = 2*m;
+
 void PrecomputationElement(const data_t *T, data_t (&mu)[sublen], data_t (&df)[sublen], data_t (&dg)[sublen], data_t (&inv)[sublen], 
                                      data_t (&QT)[sublen], data_t (&P)[sublen], aggregate_t (&rowAggregate)[sublen], aggregate_t (&columnAggregate)[sublen]) {
     #pragma HLS INLINE
@@ -149,7 +151,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     data_t QT[sublen], P[sublen];
 
     aggregate_t rowAggregate[sublen], columnAggregate[sublen];
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=m
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=m2
 
     PrecomputationElement(T, mu, df, dg, inv, QT, P, rowAggregate, columnAggregate);
 
