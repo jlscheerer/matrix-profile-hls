@@ -140,7 +140,6 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     // Do the actual calculations via updates
     MatrixProfileComputeRow:
     for (index_t row = 1; row < sublen; ++row) {
-        data_t dfi = df[row]; data_t dgi = dg[row]; data_t invi = inv[row];
         // exclusionZone integrated into loop bounds
         // exclusionZone <==> row - m/4 <= column <= row + m/4
         //               <==> column <= row + m/4 [(row <= column, m > 0) ==> row - m/4 <= column]
@@ -151,16 +150,16 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
             #pragma HLS PIPELINE II=1
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
-            QT[k] = QT[k] + dfi * dg[k + row] + df[k + row] * dgi;
+            QT[k] = QT[k] + df[row] * dg[k + row] + df[k + row] * dg[row];
             // calculate pearson correlation
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
-            P[k] = QT[k] * invi * inv[k + row];
+            P[k] = QT[k] * inv[row] * inv[k + row];
 
             // Update Aggregates
             const index_t column = row + k;
-            if(P[k] > columnAggregate[column].value)
+            if(P[k] > columnAggregate[column].value && column < sublen)
                 columnAggregate[column] = {P[k], static_cast<index_t>(row)};
-            if(P[k] > rowAggregate[row].value)
+            if(P[k] > rowAggregate[row].value && column < sublen)
                 rowAggregate[row] = {P[k], static_cast<index_t>(column)};
         }
     }
