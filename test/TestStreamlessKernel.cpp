@@ -12,7 +12,7 @@ namespace MatrixProfileTests {
     // wrapper struct to have multiple StreamlessKernel instances
     // with different confugrations (data_t, index_t, n, m)
     // this allows for multiple test (without having to recompile)
-    template<typename data_t, typename index_t, size_t n, size_t m>
+    template<typename data_t, typename index_t, int n, int m>
     struct StreamlessKernel: public MatrixProfileKernel<data_t, index_t, n, m> {
         // "negative infinity" used to initialize aggregates
         static constexpr data_t aggregate_init = AggregateInit<data_t>();

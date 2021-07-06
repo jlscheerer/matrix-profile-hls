@@ -40,7 +40,7 @@ set_property(CACHE MP_INDEX_TYPE PROPERTY STRINGS ${VALID_INDEX_TYPES})
 
 set(MP_SIZE_N 8 CACHE STRING "length of the time series data")
 set(MP_SIZE_M 4 CACHE STRING "subsequence length for the matrix profile")
-set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream2D) [assumption: t ≥ m]")
+set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream1D/Stream2D) [assumption: t ≥ m]")
 
 # Custom option to enable software testing using google-test
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
@@ -77,7 +77,7 @@ if(NOT(${MP_SIZE_M} MATCHES "^[0-9]+$") OR ${MP_SIZE_N} LESS ${MP_SIZE_M})
     message(FATAL_ERROR "The specified value for 'MP_SIZE_M' [\"${MP_SIZE_M}\"] is invalid, m has to be numeric and ≤ n!")
 endif()
 
-if(("${MP_KERNEL}" STREQUAL "Stream2D") AND (NOT(${MP_SIZE_T} MATCHES "^[0-9]+$") OR ${MP_SIZE_T} LESS ${MP_SIZE_M}))
+if(NOT("${MP_KERNEL}" STREQUAL "Streamless") AND (NOT(${MP_SIZE_T} MATCHES "^[0-9]+$") OR ${MP_SIZE_T} LESS ${MP_SIZE_M}))
     message(FATAL_ERROR "The specified value for 'MP_SIZE_T' [\"${MP_SIZE_T}\"] is invalid, t has to be numeric and ≥ m!")
 endif()
 # /check parameter validity
@@ -123,7 +123,7 @@ configure_file(config/common-config.cfg.in config/common-config.cfg)
 configure_file(config/compile-config.cfg.in config/compile-config.cfg)
 configure_file(config/link-config.cfg.in config/link-config.cfg)
 
-if("${MP_KERNEL}" STREQUAL "Stream2D")
+if(NOT("${MP_KERNEL}" STREQUAL "Streamless"))
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/reports/build-info.txt" "[Configuration]\nMP_PLATFORM=${MP_PLATFORM}\nMP_EMBEDDED=${MP_EMBEDDED}\nMP_TARGET=${MP_TARGET}\nMP_QUICK_BUILD=${MP_QUICK_BUILD}\n\nMP_KERNEL=${MP_KERNEL}\nMP_SIZE_N=${MP_SIZE_N}\nMP_SIZE_M=${MP_SIZE_M}\nMP_SIZE_T=${MP_SIZE_T}\n\nMP_DATA_TYPE=${MP_DATA_TYPE}\nMP_INDEX_TYPE=${MP_INDEX_TYPE}\n")
 else()
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/reports/build-info.txt" "[Configuration]\nMP_PLATFORM=${MP_PLATFORM}\nMP_EMBEDDED=${MP_EMBEDDED}\nMP_TARGET=${MP_TARGET}\nMP_QUICK_BUILD=${MP_QUICK_BUILD}\n\nMP_KERNEL=${MP_KERNEL}\nMP_SIZE_N=${MP_SIZE_N}\nMP_SIZE_M=${MP_SIZE_M}\n\nMP_DATA_TYPE=${MP_DATA_TYPE}\nMP_INDEX_TYPE=${MP_INDEX_TYPE}\n")

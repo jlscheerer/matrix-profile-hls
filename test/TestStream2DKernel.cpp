@@ -12,7 +12,7 @@ namespace MatrixProfileTests {
     // wrapper struct to have multiple Stream2DKernel instances
     // with different confugrations (data_t, index_t, n, m, t)
     // this allows for multiple test (without having to recompile)
-    template<typename data_t, typename index_t, size_t n, size_t m, size_t t>
+    template<typename data_t, typename index_t, int n, int m, int t>
     struct Stream2DKernel: public MatrixProfileKernel<data_t, index_t, n, m> {
         // "negative infinity" used to initialize aggregates
         static constexpr data_t aggregate_init = AggregateInit<data_t>();
@@ -27,6 +27,7 @@ namespace MatrixProfileTests {
 
         #include "MatrixProfileKernelStream2D.cpp"
     };
+    
     TEST(TestStream2DKernel, TestSmall8SynM4) {
         Stream2DKernel<double, int, 8, 4, 4> kernel;
         TestMatrixProfileKernel(kernel, "synthetic/small8_syn.txt");
