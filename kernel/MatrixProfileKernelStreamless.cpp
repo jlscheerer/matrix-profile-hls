@@ -11,9 +11,23 @@
     #include "hls_math.h"
 #endif
 
-void PrecomputationElement(const data_t *T, data_t (&mu)[sublen], data_t (&df)[sublen], data_t (&dg)[sublen], data_t (&inv)[sublen], 
-                                     data_t (&QT)[sublen], data_t (&P)[sublen], aggregate_t (&rowAggregate)[sublen], aggregate_t (&columnAggregate)[sublen]) {
+data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     #pragma HLS INLINE
+    return sqrt(2 * m * (1 - PearsonCorrelation));
+}
+
+void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
+    #pragma HLS INTERFACE m_axi port=T   offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=MP  offset=slave bundle=gmem1
+    #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem2
+
+    data_t mu[sublen], df[sublen], dg[sublen], inv[sublen];
+    data_t QT[sublen], P[sublen];
+
+    aggregate_t rowAggregate[sublen], columnAggregate[sublen];
+    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=3
+
+    // =============== [Precompute] ===============
     // use T_m as shift register containing the previous m T elements
     // need to be able to access these elements with no contention
     data_t T_m[m];
@@ -120,43 +134,12 @@ void PrecomputationElement(const data_t *T, data_t (&mu)[sublen], data_t (&df)[s
     }
     // set the aggregates for the first row
     rowAggregate[0] = rowAggregate_m;
-}
+    // =============== [/Precompute] ===============
 
-data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
-    #pragma HLS INLINE
-    return sqrt(2 * m * (1 - PearsonCorrelation));
-}
-
-void ReductionElement(aggregate_t (&rowAggregate)[sublen], aggregate_t (&columnAggregate)[sublen], data_t *MP, index_t *MPI) {
-    #pragma HLS INLINE
-    // Just always take the max
-    ReductionCompute:
-    for (index_t i = 0; i < sublen; ++i) {
-        #pragma HLS PIPELINE II=1
-        aggregate_t rowAggregate_m = rowAggregate[i], columnAggregate_m = columnAggregate[i];
-        // Take the max and compute EuclideanDistance
-        MP[i]  = PearsonCorrelationToEuclideanDistance(rowAggregate_m.value > columnAggregate_m.value ? rowAggregate_m.value : columnAggregate_m.value);
-        MPI[i] = rowAggregate_m.value > columnAggregate_m.value ? rowAggregate_m.index : columnAggregate_m.index;
-    }
-}
-
-void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
-    #pragma HLS INTERFACE m_axi port=T   offset=slave bundle=gmem0
-    #pragma HLS INTERFACE m_axi port=MP  offset=slave bundle=gmem1
-    #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem2
-
-    data_t mu[sublen], df[sublen], dg[sublen], inv[sublen];
-    data_t QT[sublen], P[sublen];
-
-    aggregate_t rowAggregate[sublen], columnAggregate[sublen];
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=3
-
-    PrecomputationElement(T, mu, df, dg, inv, QT, P, rowAggregate, columnAggregate);
-
+    // =============== [/Compute] ===============
     // Do the actual calculations via updates
     MatrixProfileComputeRow:
     for (index_t row = 1; row < sublen; ++row) {
-        data_t dfi = df[row]; data_t dgi = dg[row]; data_t invi = inv[row];
         // exclusionZone integrated into loop bounds
         // exclusionZone <==> row - m/4 <= column <= row + m/4
         //               <==> column <= row + m/4 [(row <= column, m > 0) ==> row - m/4 <= column]
@@ -167,19 +150,30 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
             #pragma HLS PIPELINE II=1
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
-            QT[k] = QT[k] + dfi * dg[k + row] + df[k + row] * dgi;
+            QT[k] = QT[k] + df[row] * dg[k + row] + df[k + row] * dg[row];
             // calculate pearson correlation
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
-            P[k] = QT[k] * invi * inv[k + row];
+            P[k] = QT[k] * inv[row] * inv[k + row];
 
             // Update Aggregates
             const index_t column = row + k;
-            if(P[k] > columnAggregate[column].value)
+            if(P[k] > columnAggregate[column].value && column < sublen)
                 columnAggregate[column] = {P[k], static_cast<index_t>(row)};
-            if(P[k] > rowAggregate[row].value)
+            if(P[k] > rowAggregate[row].value && column < sublen)
                 rowAggregate[row] = {P[k], static_cast<index_t>(column)};
         }
     }
+    // =============== [/Compute] ===============
     
-    ReductionElement(rowAggregate, columnAggregate, MP, MPI);
+    // =============== [Reduce] ===============
+    // Just always take the max
+    ReductionCompute:
+    for (index_t i = 0; i < sublen; ++i) {
+        #pragma HLS PIPELINE II=1
+        aggregate_t rowAggregate_m = rowAggregate[i], columnAggregate_m = columnAggregate[i];
+        // Take the max and compute EuclideanDistance
+        MP[i]  = PearsonCorrelationToEuclideanDistance(rowAggregate_m.value > columnAggregate_m.value ? rowAggregate_m.value : columnAggregate_m.value);
+        MPI[i] = rowAggregate_m.value > columnAggregate_m.value ? rowAggregate_m.index : columnAggregate_m.index;
+    }
+    // =============== [/Reduce] ===============
 }
