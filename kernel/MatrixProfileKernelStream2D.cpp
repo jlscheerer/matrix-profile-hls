@@ -113,76 +113,6 @@ void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &sT, stream
     }
 }
 
-void MatrixProfileComputeUnit(index_t yStage, index_t xStage, data_t (&Ti_m)[m], data_t (&Tj_m)[t + m - 1], data_t mui_m, data_t (&muj_m)[t], 
-                              data_t (&dfi_m)[t], data_t (&dfj_m)[2 * t - 1], data_t (&dgi_m)[t], data_t (&dgj_m)[2 * t - 1], data_t (&invi_m)[t], 
-                              data_t (&invj_m)[2 * t - 1], aggregate_t (&rowAggregate)[t], aggregate_t (&columnAggregate)[2 * t - 1]) {
-    #pragma HLS INLINE
-
-    data_t QT[t], P[t];
-    aggregate_t rowAggregate_m = aggregate_t_init;
-    
-    // Compute the Matrix Profile (here)
-    const index_t yOffset = yStage * t;
-    const index_t xOffset = xStage * t;
-
-    // Exclusion Zone <==> realX - m/4 <= realY <= realX + m/4
-    // 				  <==> (xStage * t + r + i) - m/4 <= yStage * t + r <= (xStage * t + r + i) + m/4
-    // 				  <==> xStage * t + i - m/4 <= yStage * t <= xStage * t + i + m/4
-    // 				  <==> xStage * t + i - m/4 <= yStage * t [t > 0, xStage >= yStage, i > 0, m/4 > 0]
-    //    			  <==> (xStage - yStage) * t + i - m/4 <= 0
-    // 				  <==> (xStage - yStage) * t - m/4 <= -i
-    //   			  <==> i <= (yStage - xStage) * t + m/4
-    const index_t exclusionZone = max((yStage - xStage) * t + m / 4, 0);
-
-    // compute the first row of the matrix
-    MatrixProfileComputeInitQRow:
-    for (index_t i = exclusionZone; i < min(t, n - m + 1 - t * xStage); ++i) {
-        #pragma HLS PIPELINE II=1
-        // compute convolution explicitly
-        data_t sum = 0;
-        MatrixProfileComputeInitQColumn:
-        for (index_t j = 0; j < m; j++) {
-            #pragma HLS UNROLL
-            sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
-        }
-        QT[i] = sum;
-        data_t PearsonCorrelation = QT[i] * invi_m[0] * invj_m[i];
-
-        // update aggregates in case of improvement
-        if (PearsonCorrelation > rowAggregate_m.value)
-            rowAggregate_m = {PearsonCorrelation, static_cast<index_t>(i + xOffset)}; // remember "best" column for rows
-        if (PearsonCorrelation != aggregate_init)
-            columnAggregate[i] = {PearsonCorrelation, static_cast<index_t>(0 + yOffset)}; // remember "best" row for columns
-    }
-    rowAggregate[0] = rowAggregate_m;    
-
-    // Compute (t-1) rows using the simplification
-    MatrixProfileComputeRow:
-    for (index_t r = 1; r < t; ++r) {
-        rowAggregate_m = aggregate_t_init;
-        MatrixProfileComputeColumn:
-        for (index_t i = exclusionZone; i < min(t, n - m - t * xStage - r + 1); ++i) {
-            #pragma HLS PIPELINE II=1
-            
-            // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
-            // QT[i] was the previous value (i.e. value diagonally above the current QT[i])
-            QT[i] = QT[i] + dfi_m[r] * dgj_m[i + r] + dfj_m[i + r] * dgi_m[r];
-
-            // calculate Pearson Correlation
-            P[i] = QT[i] * invi_m[r] * invj_m[i + r];
-            
-            if (P[i] > rowAggregate_m.value)
-                rowAggregate_m = {P[i], static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
-            
-            const index_t column = r + i;
-            if (P[i] > columnAggregate[column].value)
-                columnAggregate[column] = {P[i], static_cast<index_t>(r + yOffset)}; // remember "best" row for columns
-        }
-        rowAggregate[r] = rowAggregate_m;
-    }
-
-}
-
 void PrimaryDiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, stream_d> &sT_in,
         stream<data_t, stream_d> &sMu_in, stream<data_t, stream_d> &sDf_in, stream<data_t, stream_d> &sDg_in, stream<data_t, stream_d> &sInv_in,
 
@@ -196,12 +126,9 @@ void PrimaryDiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t
         stream<data_t, stream_d> &sInv_out) {
     // local "cache" for time series values for the current row/column
     data_t Ti_m[m], Tj_m[t + m - 1];
-    #pragma HLS ARRAY_PARTITION variable=Ti_m complete
-    #pragma HLS ARRAY_PARTITION variable=Tj_m cyclic factor=m
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
-    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=m
     
     // local "cache" for df/dg for the current row/column
     data_t dfi_m[t], dfj_m[2 * t - 1], dgi_m[t], dgj_m[2 * t - 1];
@@ -211,7 +138,6 @@ void PrimaryDiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t
 
     // factor=3 required for fadd and fmul (update if data_t changes)
     aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate complete
     // =============== [Scatter] ===============
     data_t mu = 0, df = 0, dg = 0, inv = 0;
     ScatterDiagonalLane:
@@ -289,9 +215,67 @@ void PrimaryDiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t
 
     // =============== [Compute] =============== 
     
-    // After getting the required data can now compute portion of the matrix profile
-    MatrixProfileComputeUnit(yStage, xStage, Ti_m, Tj_m, mui_m, muj_m, dfi_m, dfj_m, dgi_m, dgj_m, invi_m, invj_m, rowAggregate, columnAggregate);
+    data_t QT[t], P[t];
+    aggregate_t rowAggregate_m = aggregate_t_init;
     
+    // Compute the Matrix Profile (here)
+    const index_t yOffset = yStage * t;
+    const index_t xOffset = xStage * t;
+
+    // Exclusion Zone <==> realX - m/4 <= realY <= realX + m/4
+    // 				  <==> (xStage * t + r + i) - m/4 <= yStage * t + r <= (xStage * t + r + i) + m/4
+    // 				  <==> xStage * t + i - m/4 <= yStage * t <= xStage * t + i + m/4
+    // 				  <==> xStage * t + i - m/4 <= yStage * t [t > 0, xStage >= yStage, i > 0, m/4 > 0]
+    //    			  <==> (xStage - yStage) * t + i - m/4 <= 0
+    // 				  <==> (xStage - yStage) * t - m/4 <= -i
+    //   			  <==> i <= (yStage - xStage) * t + m/4
+    const index_t exclusionZone = max((yStage - xStage) * t + m / 4, 0);
+
+    // compute the first row of the matrix
+    MatrixProfileComputeInitQRow:
+    for (index_t i = exclusionZone; i < min(t, n - m + 1 - t * xStage); ++i) {
+        // compute convolution explicitly
+        data_t sum = 0;
+        MatrixProfileComputeInitQColumn:
+        for (index_t j = 0; j < m; j++) {
+            sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
+        }
+        QT[i] = sum;
+        data_t PearsonCorrelation = QT[i] * invi_m[0] * invj_m[i];
+
+        // update aggregates in case of improvement
+        if (PearsonCorrelation > rowAggregate_m.value)
+            rowAggregate_m = {PearsonCorrelation, static_cast<index_t>(i + xOffset)}; // remember "best" column for rows
+        if (PearsonCorrelation != aggregate_init)
+            columnAggregate[i] = {PearsonCorrelation, static_cast<index_t>(0 + yOffset)}; // remember "best" row for columns
+    }
+    rowAggregate[0] = rowAggregate_m;    
+
+    // Compute (t-1) rows using the simplification
+    MatrixProfileComputeRow:
+    for (index_t r = 1; r < t; ++r) {
+        rowAggregate_m = aggregate_t_init;
+        MatrixProfileComputeColumn:
+        for (index_t i = exclusionZone; i < min(t, n - m - t * xStage - r + 1); ++i) {
+            #pragma HLS PIPELINE II=1
+            
+            // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
+            // QT[i] was the previous value (i.e. value diagonally above the current QT[i])
+            QT[i] = QT[i] + dfi_m[r] * dgj_m[i + r] + dfj_m[i + r] * dgi_m[r];
+
+            // calculate Pearson Correlation
+            P[i] = QT[i] * invi_m[r] * invj_m[i + r];
+            
+            if (P[i] > rowAggregate_m.value)
+                rowAggregate_m = {P[i], static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
+            
+            const index_t column = r + i;
+            if (P[i] > columnAggregate[column].value)
+                columnAggregate[column] = {P[i], static_cast<index_t>(r + yOffset)}; // remember "best" row for columns
+        }
+        rowAggregate[r] = rowAggregate_m;
+    }
+
     // =============== [/Compute] ===============
 
     // =============== [Reduce] ===============
@@ -327,12 +311,9 @@ void DiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, strea
         stream<aggregate_t, stream_d> &rowAggregate_out, stream<aggregate_t, stream_d> &columnAggregate_out) {
     // local "cache" for time series values for the current row/column
     data_t Ti_m[m], Tj_m[t + m - 1];
-    #pragma HLS ARRAY_PARTITION variable=Ti_m complete
-    #pragma HLS ARRAY_PARTITION variable=Tj_m cyclic factor=m
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
-    #pragma HLS ARRAY_PARTITION variable=muj_m cyclic factor=m
     
     // local "cache" for df/dg for the current row/column
     data_t dfi_m[t], dfj_m[2 * t - 1], dgi_m[t], dgj_m[2 * t - 1];
@@ -342,7 +323,6 @@ void DiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, strea
 
     // factor=3 required for fadd and fmul (update if data_t changes)
     aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate complete
     // =============== [Scatter] ===============
     // RowStreaming: Read Values for the current row
     // TODO: Reformat memory writes
@@ -428,9 +408,67 @@ void DiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, strea
 
     // =============== [Compute] ===============
 
-    // After getting the required data can now compute portion of the matrix profile
-    MatrixProfileComputeUnit(yStage, xStage, Ti_m, Tj_m, mui_m, muj_m, dfi_m, dfj_m, dgi_m, dgj_m, invi_m, invj_m, rowAggregate, columnAggregate);
+    data_t QT[t], P[t];
+    aggregate_t rowAggregate_m = aggregate_t_init;
     
+    // Compute the Matrix Profile (here)
+    const index_t yOffset = yStage * t;
+    const index_t xOffset = xStage * t;
+
+    // Exclusion Zone <==> realX - m/4 <= realY <= realX + m/4
+    // 				  <==> (xStage * t + r + i) - m/4 <= yStage * t + r <= (xStage * t + r + i) + m/4
+    // 				  <==> xStage * t + i - m/4 <= yStage * t <= xStage * t + i + m/4
+    // 				  <==> xStage * t + i - m/4 <= yStage * t [t > 0, xStage >= yStage, i > 0, m/4 > 0]
+    //    			  <==> (xStage - yStage) * t + i - m/4 <= 0
+    // 				  <==> (xStage - yStage) * t - m/4 <= -i
+    //   			  <==> i <= (yStage - xStage) * t + m/4
+    const index_t exclusionZone = max((yStage - xStage) * t + m / 4, 0);
+
+    // compute the first row of the matrix
+    MatrixProfileComputeInitQRow:
+    for (index_t i = exclusionZone; i < min(t, n - m + 1 - t * xStage); ++i) {
+        // compute convolution explicitly
+        data_t sum = 0;
+        MatrixProfileComputeInitQColumn:
+        for (index_t j = 0; j < m; j++) {
+            sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
+        }
+        QT[i] = sum;
+        data_t PearsonCorrelation = QT[i] * invi_m[0] * invj_m[i];
+
+        // update aggregates in case of improvement
+        if (PearsonCorrelation > rowAggregate_m.value)
+            rowAggregate_m = {PearsonCorrelation, static_cast<index_t>(i + xOffset)}; // remember "best" column for rows
+        if (PearsonCorrelation != aggregate_init)
+            columnAggregate[i] = {PearsonCorrelation, static_cast<index_t>(0 + yOffset)}; // remember "best" row for columns
+    }
+    rowAggregate[0] = rowAggregate_m;    
+
+    // Compute (t-1) rows using the simplification
+    MatrixProfileComputeRow:
+    for (index_t r = 1; r < t; ++r) {
+        rowAggregate_m = aggregate_t_init;
+        MatrixProfileComputeColumn:
+        for (index_t i = exclusionZone; i < min(t, n - m - t * xStage - r + 1); ++i) {
+            #pragma HLS PIPELINE II=1
+            
+            // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
+            // QT[i] was the previous value (i.e. value diagonally above the current QT[i])
+            QT[i] = QT[i] + dfi_m[r] * dgj_m[i + r] + dfj_m[i + r] * dgi_m[r];
+
+            // calculate Pearson Correlation
+            P[i] = QT[i] * invi_m[r] * invj_m[i + r];
+            
+            if (P[i] > rowAggregate_m.value)
+                rowAggregate_m = {P[i], static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
+            
+            const index_t column = r + i;
+            if (P[i] > columnAggregate[column].value)
+                columnAggregate[column] = {P[i], static_cast<index_t>(r + yOffset)}; // remember "best" row for columns
+        }
+        rowAggregate[r] = rowAggregate_m;
+    }
+
     // =============== [/Compute] ===============
 
     // =============== [Reduce] ===============
