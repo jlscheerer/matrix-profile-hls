@@ -49,7 +49,7 @@ make link
 | ``DMP_SIZE_M``      | Subsequence Length        |                                                                       |
 | ``DMP_SIZE_T``      | Tile-Size                 | *only applicable for Stream1D/Stream2D-Kernel*                        |
 
-For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platforms) reference [``CMakeLists.txt``](CMakeLists.txt).
+For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platforms) reference see [``CMakeLists.txt``](CMakeLists.txt).
 
 Per default the build targets the Alveo U250 acceleration board, but this can be configured using the ``MP_PLATFORM`` CMake parameter.
 
