@@ -32,7 +32,7 @@ An example of configuring the kernel (starting from the ``root`` directory):
 
 ```bash
 mkdir build && cd build
-cmake .. -DMP_KERNEL=Stream2D -MP_DATA_TYPE=double -DMP_SIZE_N=1024 -DMP_SIZE_M=64 -DMP_SIZE_T=256
+cmake .. -DMP_KERNEL=Stream1D -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=256 -DMP_SIZE_M=32 -DMP_SIZE_T=64
 make host
 make compile
 make link
@@ -49,7 +49,7 @@ make link
 | ``DMP_SIZE_M``      | Subsequence Length        |                                                                       |
 | ``DMP_SIZE_T``      | Tile-Size                 | *only applicable for Stream1D/Stream2D-Kernel*                        |
 
-For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platforms) reference see [``CMakeLists.txt``](CMakeLists.txt).
+For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platforms) see [``CMakeLists.txt``](CMakeLists.txt).
 
 Per default the build targets the Alveo U250 acceleration board, but this can be configured using the ``MP_PLATFORM`` CMake parameter.
 
