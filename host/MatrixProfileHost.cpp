@@ -29,7 +29,6 @@ using OpenCL::Access;
 using OpenCL::MemoryBank;
 
 /**
- * : Comment for this function
  * @param xclbin full path to the (.xclbin) binary
  * @param input  input (time series) file name (without extension), located under data/binary/
  * @param output output (matrix profile/matrix profile index) file name (without extension); if specified
@@ -37,7 +36,6 @@ using OpenCL::MemoryBank;
  * @return int   EXIT_SUCCESS in the case of a sucessful execution and EXIT_FAILURE otherwise
  */
 int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, const optional<std::string> &output){
-    // TODO: Use alligned Allocator for Host-Side Memory
     // Allocate Host-Side Memory
     std::array<data_t, n> host_T;
     std::array<data_t, sublen> host_MP;
