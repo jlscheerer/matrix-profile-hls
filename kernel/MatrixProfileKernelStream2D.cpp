@@ -11,6 +11,8 @@
     #include "hls_math.h"
     #include "hls_stream.h"
 
+    #include "kernel/HLSMathUtil.hpp"
+
     using hls::stream;
 #endif
 
@@ -57,7 +59,7 @@ void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &sT, stream
 
     // do the first iteration manually (mean, inv, df, dg)
     sMu.write(mean); sDf.write(0); sDg.write(0);
-    sInv.write(1 / sqrt(inv_sum));
+    sInv.write(static_cast<data_t>(1) / sqrt(inv_sum));
 
     PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
@@ -94,7 +96,7 @@ void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &sT, stream
         }
         // perform last element of the loop separately (this requires the new val
         inv_sum += (Ti - mean) * (Ti - mean);
-        sInv.write(1 / sqrt(inv_sum));
+        sInv.write(static_cast<data_t>(1) / sqrt(inv_sum));
 
         // shift all values in T_m back
         PrecomputationComputeShift:
@@ -523,7 +525,7 @@ void ReductionElement(index_t yStage, stream<aggregate_t, stream_d> &rRow_in, st
 
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     #pragma HLS INLINE
-    return sqrt(2 * m * (1 - PearsonCorrelation));
+    return sqrt(static_cast<data_t>(2 * m * (1 - PearsonCorrelation)));
 }
 
 void StreamToMemoryElement(stream<aggregate_t, stream_d> &rRow_in, stream<aggregate_t, stream_d> &rCol_in, data_t *MP, index_t *MPI) {
