@@ -162,14 +162,14 @@ void DiagonalComputeElement(const index_t stage, stream<data_t, stream_d> &QT_in
             #pragma HLS PIPELINE II=1
 
             data_t dfi = df_m[k], dgi = dg_m[k], invi = inv_m[k];
-            data_t dfj = (stage * t + k + i < n - m + 1) ? df_m[stage * t + k + i] : static_cast<data_t>(0);
-            data_t dgj = (stage * t + k + i < n - m + 1) ? dg_m[stage * t + k + i] : static_cast<data_t>(0);
-            data_t invj = (stage * t + k + i < n - m + 1) ? inv_m[stage * t + k + i] : static_cast<data_t>(0);
+            bool computationInRange = stage * t + k + i < n - m + 1;
+            data_t dfj = computationInRange ? df_m[stage * t + k + i] : static_cast<data_t>(0);
+            data_t dgj = computationInRange ? dg_m[stage * t + k + i] : static_cast<data_t>(0);
+            data_t invj = computationInRange ? inv_m[stage * t + k + i] : static_cast<data_t>(0);
 
             QT[i] += dfi * dgj + dfj * dgi;
             data_t PearsonCorrelation = QT[i] * invi * invj;
 
-            bool computationInRange = stage * t + k + i < n - m + 1;
             bool exclusionZone = stage * t + i < m / 4;
 
             if (computationInRange && !exclusionZone) {

@@ -216,10 +216,8 @@ void PrimaryDiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t
     // =============== [/Scatter] ===============
 
     // =============== [Compute] =============== 
-    
     data_t QT[t], P[t];
-    aggregate_t rowAggregate_m = aggregate_t_init;
-    
+
     // Compute the Matrix Profile (here)
     const index_t yOffset = yStage * t;
     const index_t xOffset = xStage * t;
@@ -235,47 +233,51 @@ void PrimaryDiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t
 
     // compute the first row of the matrix
     MatrixProfileComputeInitQRow:
-    for (index_t i = exclusionZone; i < min(t, n - m + 1 - t * xStage); ++i) {
+    for (index_t i = exclusionZone; i < t; ++i) {
+        const bool computationInRange =  xOffset + i < n - m + 1;
         // compute convolution explicitly
         data_t sum = 0;
         MatrixProfileComputeInitQColumn:
         for (index_t j = 0; j < m; j++) {
             sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
         }
-        QT[i] = sum;
-        data_t PearsonCorrelation = QT[i] * invi_m[0] * invj_m[i];
+        if (computationInRange) {
+            QT[i] = sum;
+            data_t PearsonCorrelation = QT[i] * invi_m[0] * invj_m[i];
 
-        // update aggregates in case of improvement
-        if (PearsonCorrelation > rowAggregate_m.value)
-            rowAggregate_m = {PearsonCorrelation, static_cast<index_t>(i + xOffset)}; // remember "best" column for rows
-        if (PearsonCorrelation != aggregate_init)
-            columnAggregate[i] = {PearsonCorrelation, static_cast<index_t>(0 + yOffset)}; // remember "best" row for columns
+            // update aggregates in case of improvement
+            if (PearsonCorrelation > rowAggregate[0].value)
+                rowAggregate[0] = {PearsonCorrelation, static_cast<index_t>(i + xOffset)}; // remember "best" column for rows
+            if (PearsonCorrelation != aggregate_init)
+                columnAggregate[i] = {PearsonCorrelation, static_cast<index_t>(0 + yOffset)}; // remember "best" row for columns
+        }
     }
-    rowAggregate[0] = rowAggregate_m;    
 
     // Compute (t-1) rows using the simplification
     MatrixProfileComputeRow:
-    for (index_t r = 1; r < t; ++r) {
-        rowAggregate_m = aggregate_t_init;
+    for (index_t k = 1; k < t; ++k) {
         MatrixProfileComputeColumn:
-        for (index_t i = exclusionZone; i < min(t, n - m - t * xStage - r + 1); ++i) {
-            #pragma HLS PIPELINE II=1
+        for (index_t i = exclusionZone; i < t; ++i) {
+            data_t dfi = dfi_m[k], dgi = dgi_m[k], invi = invi_m[k];
+
+            const bool computationInRange =  xOffset + k + i < n - m + 1;
+            data_t dfj = computationInRange ? dfj_m[k + i] : static_cast<data_t>(0);
+            data_t dgj = computationInRange ? dgj_m[k + i] : static_cast<data_t>(0);
+            data_t invj = computationInRange ? invj_m[k + i] : static_cast<data_t>(0);
             
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[i] was the previous value (i.e. value diagonally above the current QT[i])
-            QT[i] = QT[i] + dfi_m[r] * dgj_m[i + r] + dfj_m[i + r] * dgi_m[r];
+            QT[i] += dfi * dgj + dfj * dgi;
 
             // calculate Pearson Correlation
-            P[i] = QT[i] * invi_m[r] * invj_m[i + r];
+            P[i] = QT[i] * invi * invj;
             
-            if (P[i] > rowAggregate_m.value)
-                rowAggregate_m = {P[i], static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
-            
-            const index_t column = r + i;
-            if (P[i] > columnAggregate[column].value)
-                columnAggregate[column] = {P[i], static_cast<index_t>(r + yOffset)}; // remember "best" row for columns
+            const index_t column = k + i;
+            if (computationInRange && P[i] > rowAggregate[k].value)
+                rowAggregate[k] = {P[i], static_cast<index_t>(column + xOffset)}; // remember "best" column for rows
+            if (computationInRange && P[i] > columnAggregate[column].value)
+                columnAggregate[column] = {P[i], static_cast<index_t>(k + yOffset)}; // remember "best" row for columns
         }
-        rowAggregate[r] = rowAggregate_m;
     }
 
     // =============== [/Compute] ===============
@@ -408,9 +410,7 @@ void DiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, strea
     // =============== [/Scatter] ===============
 
     // =============== [Compute] ===============
-
     data_t QT[t], P[t];
-    aggregate_t rowAggregate_m = aggregate_t_init;
     
     // Compute the Matrix Profile (here)
     const index_t yOffset = yStage * t;
@@ -427,47 +427,51 @@ void DiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, strea
 
     // compute the first row of the matrix
     MatrixProfileComputeInitQRow:
-    for (index_t i = exclusionZone; i < min(t, n - m + 1 - t * xStage); ++i) {
+    for (index_t i = exclusionZone; i < t; ++i) {
+        const bool computationInRange =  xOffset + i < n - m + 1;
         // compute convolution explicitly
         data_t sum = 0;
         MatrixProfileComputeInitQColumn:
         for (index_t j = 0; j < m; j++) {
             sum += (Ti_m[j] - mui_m) * (Tj_m[i + j] - muj_m[i]);
         }
-        QT[i] = sum;
-        data_t PearsonCorrelation = QT[i] * invi_m[0] * invj_m[i];
+        if (computationInRange) {
+            QT[i] = sum;
+            data_t PearsonCorrelation = QT[i] * invi_m[0] * invj_m[i];
 
-        // update aggregates in case of improvement
-        if (PearsonCorrelation > rowAggregate_m.value)
-            rowAggregate_m = {PearsonCorrelation, static_cast<index_t>(i + xOffset)}; // remember "best" column for rows
-        if (PearsonCorrelation != aggregate_init)
-            columnAggregate[i] = {PearsonCorrelation, static_cast<index_t>(0 + yOffset)}; // remember "best" row for columns
+            // update aggregates in case of improvement
+            if (PearsonCorrelation > rowAggregate[0].value)
+                rowAggregate[0] = {PearsonCorrelation, static_cast<index_t>(i + xOffset)}; // remember "best" column for rows
+            if (PearsonCorrelation != aggregate_init)
+                columnAggregate[i] = {PearsonCorrelation, static_cast<index_t>(0 + yOffset)}; // remember "best" row for columns
+        }
     }
-    rowAggregate[0] = rowAggregate_m;    
 
     // Compute (t-1) rows using the simplification
     MatrixProfileComputeRow:
-    for (index_t r = 1; r < t; ++r) {
-        rowAggregate_m = aggregate_t_init;
+    for (index_t k = 1; k < t; ++k) {
         MatrixProfileComputeColumn:
-        for (index_t i = exclusionZone; i < min(t, n - m - t * xStage - r + 1); ++i) {
-            #pragma HLS PIPELINE II=1
+        for (index_t i = exclusionZone; i < t; ++i) {
+            data_t dfi = dfi_m[k], dgi = dgi_m[k], invi = invi_m[k];
+
+            const bool computationInRange =  xOffset + k + i < n - m + 1;
+            data_t dfj = computationInRange ? dfj_m[k + i] : static_cast<data_t>(0);
+            data_t dgj = computationInRange ? dgj_m[k + i] : static_cast<data_t>(0);
+            data_t invj = computationInRange ? invj_m[k + i] : static_cast<data_t>(0);
             
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[i] was the previous value (i.e. value diagonally above the current QT[i])
-            QT[i] = QT[i] + dfi_m[r] * dgj_m[i + r] + dfj_m[i + r] * dgi_m[r];
+            QT[i] += dfi * dgj + dfj * dgi;
 
             // calculate Pearson Correlation
-            P[i] = QT[i] * invi_m[r] * invj_m[i + r];
+            P[i] = QT[i] * invi * invj;
             
-            if (P[i] > rowAggregate_m.value)
-                rowAggregate_m = {P[i], static_cast<index_t>(r + i + xOffset)}; // remember "best" column for rows
-            
-            const index_t column = r + i;
-            if (P[i] > columnAggregate[column].value)
-                columnAggregate[column] = {P[i], static_cast<index_t>(r + yOffset)}; // remember "best" row for columns
+            const index_t column = k + i;
+            if (computationInRange && P[i] > rowAggregate[k].value)
+                rowAggregate[k] = {P[i], static_cast<index_t>(column + xOffset)}; // remember "best" column for rows
+            if (computationInRange && P[i] > columnAggregate[column].value)
+                columnAggregate[column] = {P[i], static_cast<index_t>(k + yOffset)}; // remember "best" row for columns
         }
-        rowAggregate[r] = rowAggregate_m;
     }
 
     // =============== [/Compute] ===============

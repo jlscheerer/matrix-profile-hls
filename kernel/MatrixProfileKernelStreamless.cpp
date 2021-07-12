@@ -141,28 +141,35 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     // =============== [/Compute] ===============
     // Do the actual calculations via updates
     MatrixProfileComputeRow:
-    for (index_t row = 1; row < sublen; ++row) {
+    for (index_t k = 1; k < n - m + 1; ++k) {
         // exclusionZone integrated into loop bounds
         // exclusionZone <==> row - m/4 <= column <= row + m/4
         //               <==> column <= row + m/4 [(row <= column, m > 0) ==> row - m/4 <= column]
         //               <==> row + k <= row + m/4
         //               <==> k <= m/4
         MatrixProfileComputeColumn:
-        for (index_t k = (m / 4); k < sublen - row; ++k) {
-            #pragma HLS PIPELINE II=1
+        for (index_t i = (m / 4); i < n - m + 1; ++i) {
+            data_t dfi = df[k], dgi = dg[k], invi = inv[k];
+
+            const bool computationInRange = k + i < sublen;
+            data_t dfj = computationInRange ? df[k + i] : static_cast<data_t>(0);
+            data_t dgj = computationInRange ? dg[k + i] : static_cast<data_t>(0);
+            data_t invj = computationInRange ? inv[k + i] : static_cast<data_t>(0);
+
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
-            QT[k] = QT[k] + df[row] * dg[k + row] + df[k + row] * dg[row];
+            QT[i] += dfi * dgj + dfj * dgi;
+
             // calculate pearson correlation
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
-            P[k] = QT[k] * inv[row] * inv[k + row];
+            P[i] = QT[i] * inv[k] * invj;
 
             // Update Aggregates
-            const index_t column = row + k;
-            if(P[k] > columnAggregate[column].value && column < sublen)
-                columnAggregate[column] = {P[k], static_cast<index_t>(row)};
-            if(P[k] > rowAggregate[row].value && column < sublen)
-                rowAggregate[row] = {P[k], static_cast<index_t>(column)};
+            const index_t column = k + i;
+            if(computationInRange && P[i] > columnAggregate[column].value)
+                columnAggregate[column] = {P[i], static_cast<index_t>(k)};
+            if(computationInRange && P[i] > rowAggregate[k].value)
+                rowAggregate[k] = {P[i], static_cast<index_t>(column)};
         }
     }
     // =============== [/Compute] ===============
