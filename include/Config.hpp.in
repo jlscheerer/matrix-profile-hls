@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include <cstdlib>
-
 #include "ArbitraryPrecisionFixed.hpp"
 #include "AggregateTypeTraits.hpp"
 

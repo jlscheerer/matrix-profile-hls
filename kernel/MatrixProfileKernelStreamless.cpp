@@ -11,9 +11,14 @@
     #include "hls_math.h"
 #endif
 
+template<int W, int I>
+ap_fixed<W, I, AP_RND_ZERO, AP_WRAP_SM> sqrt(ap_fixed<W, I, AP_RND_ZERO, AP_WRAP_SM> x) {
+  return sqrt(x.to_double());
+}
+
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     #pragma HLS INLINE
-    return sqrt(2 * m * (1 - PearsonCorrelation));
+    return sqrt(static_cast<data_t>(2 * m * (1 - PearsonCorrelation)));
 }
 
 void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
@@ -64,7 +69,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
     }
 
-    data_t inv0 = 1 / sqrt(inv_sum);
+    data_t inv0 = static_cast<data_t>(1) / sqrt(inv_sum);
     inv[0] = inv0; QT[0] = qt_sum; P[0] = 1;
 
     // Assumption: will always be in the exclusionZone
@@ -107,13 +112,12 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
         // perform last element of the loop separately (this requires the new value)
         inv_sum += (T_i - mean) * (T_i - mean);
-        inv[i - m + 1] = 1 / sqrt(inv_sum);
+        inv[i - m + 1] = static_cast<data_t>(1) / sqrt(inv_sum);
 
         qt_sum += (T_i - mean) * (Ti_m[m - 1] - mu0);
         QT[i - m + 1] = qt_sum;
-
         // calculate Pearson Correlation: P_{i, j} = QT_{i, j} * inv_i * inv_j
-        P[i - m + 1] = qt_sum * inv0 * 1 / static_cast<data_t>(sqrt(inv_sum));
+        P[i - m + 1] = qt_sum * inv0 * (static_cast<data_t>(1) / sqrt(inv_sum));
 
         rowAggregate[i - m + 1] = aggregate_t_init;
         
@@ -132,6 +136,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         }
         T_m[m - 1] = T_i;
     }
+
     // set the aggregates for the first row
     rowAggregate[0] = rowAggregate_m;
     // =============== [/Precompute] ===============
