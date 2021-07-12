@@ -9,10 +9,9 @@
     #include "kernel/MatrixProfileKernel.hpp"
     
     #include "hls_math.h"
-    #include "hls_stream.h"
-
     #include "kernel/HLSMathUtil.hpp"
 
+    #include "hls_stream.h"
     using hls::stream;
 #endif
 
