@@ -7,14 +7,10 @@
 #if !defined(TEST_MOCK_SW)
     #include "Config.hpp"
     #include "kernel/MatrixProfileKernel.hpp"
+    #include "kernel/HLSMathUtil.hpp"
 
     #include "hls_math.h"
 #endif
-
-template<int W, int I>
-ap_fixed<W, I, AP_RND_ZERO, AP_WRAP_SM> sqrt(ap_fixed<W, I, AP_RND_ZERO, AP_WRAP_SM> x) {
-  return sqrt(x.to_double());
-}
 
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     #pragma HLS INLINE
