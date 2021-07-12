@@ -7,10 +7,11 @@
 #if !defined(TEST_MOCK_SW)
     #include "Config.hpp"
     #include "kernel/MatrixProfileKernel.hpp"
-    #include "kernel/HLSMathUtil.hpp"
-
+    
     #include "hls_math.h"
     #include "hls_stream.h"
+
+    #include "kernel/HLSMathUtil.hpp"
 
     using hls::stream;
 #endif
