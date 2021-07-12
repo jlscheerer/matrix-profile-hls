@@ -9,6 +9,7 @@
     #include "kernel/MatrixProfileKernel.hpp"
 
     #include "hls_math.h"
+    
     #include "kernel/HLSMathUtil.hpp"
 #endif
 

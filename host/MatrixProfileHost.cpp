@@ -29,7 +29,7 @@ using OpenCL::Access;
 using OpenCL::MemoryBank;
 
 /**
- * TODO: Comment for this function
+ * : Comment for this function
  * @param xclbin full path to the (.xclbin) binary
  * @param input  input (time series) file name (without extension), located under data/binary/
  * @param output output (matrix profile/matrix profile index) file name (without extension); if specified

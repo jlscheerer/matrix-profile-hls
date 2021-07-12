@@ -1,7 +1,7 @@
 /**
  * @file    MatrixProfileTests.hpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   TODO: Add Brief Description
+ * @brief   Software Test Utility functions for Matrix Profiles Computation
  */
 
 #pragma once

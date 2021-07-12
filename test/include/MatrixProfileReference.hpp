@@ -1,7 +1,7 @@
 /**
  * @file    MatrixProfileReference.hpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   TODO: Add Brief Description
+ * @brief   Reference Implementation of the SCAMP Algorithm
  */
 
 #pragma once

@@ -1,7 +1,7 @@
 /**
  * @file    ArbitraryPrecisionFixed.cpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   TODO: Add Brief Description
+ * @brief   Definitions of Arbitrary Precision Fixed Point Data Types
  */
 
 #pragma once

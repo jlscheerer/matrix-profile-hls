@@ -1,7 +1,7 @@
 /**
  * @file    AggregateTypeTraits.cpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   TODO: Add Brief Description
+ * @brief   Type Traits for Aggregates (AggregateInit, IndexInit)
  */
 
 #pragma once

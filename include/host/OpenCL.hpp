@@ -277,7 +277,6 @@ namespace OpenCL{
     Context::Context(){
         m_device = FindDevice();
         m_context = cl::Context(m_device);
-        // TODO: disable profiling for benchmarks
         m_queue = cl::CommandQueue(m_context, m_device, CL_QUEUE_PROFILING_ENABLE);
     }
 

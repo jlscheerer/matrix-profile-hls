@@ -1,7 +1,7 @@
 /**
  * @file    TestStreamlessKernel.cpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   TODO: Add Brief Description
+ * @brief   Software Tests for Streamless-Kernel
  */
 
 #include "MatrixProfileTests.hpp"

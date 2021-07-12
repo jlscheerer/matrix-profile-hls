@@ -1,7 +1,7 @@
 /**
  * @file    MockConfig.hpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   TODO: Add Brief Description
+ * @brief   Configuration for Software Testing
  */
 
 #pragma once

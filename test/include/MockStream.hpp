@@ -1,7 +1,7 @@
 /**
  * @file    MockStream.hpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   TODO: Add Brief Description
+ * @brief   Mock Implementation of hls::stream<>
  */
 
 #pragma once

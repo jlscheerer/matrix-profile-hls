@@ -1,7 +1,7 @@
 /**
  * @file    TestStream1DKernel.cpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   TODO: Add Brief Description
+ * @brief   Software Tests for Stream1D-Kernel
  */
 
 #include "MatrixProfileTests.hpp"

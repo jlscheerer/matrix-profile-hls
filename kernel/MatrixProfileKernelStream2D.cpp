@@ -327,7 +327,6 @@ void DiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, strea
     aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
     // =============== [Scatter] ===============
     // RowStreaming: Read Values for the current row
-    // TODO: Reformat memory writes
     data_t Ti = 0, mui = 0;
     RowLaneScatterRow:
     for (index_t i = 0; i < t; ++i) {
