@@ -160,16 +160,16 @@ void DiagonalComputeElement(const index_t stage, stream<data_t, stream_d> &QT_in
         for (index_t i = 0; i < t; ++i) {
             #pragma HLS PIPELINE II=1
 
-            data_t dfi = df_m[k], dgi = dg_m[k], invi = inv_m[k];
-            bool computationInRange = stage * t + k + i < n - m + 1;
-            data_t dfj = computationInRange ? df_m[stage * t + k + i] : static_cast<data_t>(0);
-            data_t dgj = computationInRange ? dg_m[stage * t + k + i] : static_cast<data_t>(0);
-            data_t invj = computationInRange ? inv_m[stage * t + k + i] : static_cast<data_t>(0);
+            const data_t dfi = df_m[k], dgi = dg_m[k], invi = inv_m[k];
+            const bool computationInRange = stage * t + k + i < n - m + 1;
+            const data_t dfj = computationInRange ? df_m[stage * t + k + i] : static_cast<data_t>(0);
+            const data_t dgj = computationInRange ? dg_m[stage * t + k + i] : static_cast<data_t>(0);
+            const data_t invj = computationInRange ? inv_m[stage * t + k + i] : static_cast<data_t>(0);
 
             QT[i] += dfi * dgj + dfj * dgi;
-            data_t PearsonCorrelation = QT[i] * invi * invj;
+            const data_t PearsonCorrelation = QT[i] * invi * invj;
 
-            bool exclusionZone = stage * t + i < m / 4;
+            const bool exclusionZone = stage * t + i < m / 4;
 
             if (computationInRange && !exclusionZone) {
                 if (PearsonCorrelation > aggregate_m[k].value)
