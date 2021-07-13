@@ -127,7 +127,7 @@ void DiagonalComputeElement(const index_t stage, stream<data_t, stream_d> &QT_in
     // local "cache" [size: (n - m + 1 - stage) would be sufficient]
     data_t df_m[n - m + 1], dg_m[n - m + 1], inv_m[n - m + 1];
     
-    data_t QT[t];
+    data_t QT[t], P[t];
     aggregate_t aggregate_m[n - m + 1];
 
     // =============== [Scatter] ===============
@@ -167,15 +167,15 @@ void DiagonalComputeElement(const index_t stage, stream<data_t, stream_d> &QT_in
             const data_t invj = computationInRange ? inv_m[stage * t + k + i] : static_cast<data_t>(0);
 
             QT[i] += dfi * dgj + dfj * dgi;
-            const data_t PearsonCorrelation = QT[i] * invi * invj;
+            P[i] = QT[i] * invi * invj;
 
             const bool exclusionZone = stage * t + i < m / 4;
 
             if (computationInRange && !exclusionZone) {
-                if (PearsonCorrelation > aggregate_m[k].value)
-                    aggregate_m[k] = (aggregate_t){PearsonCorrelation, stage * t + k + i};
-                if (PearsonCorrelation > aggregate_m[stage * t + k + i].value)
-                    aggregate_m[stage * t + k + i] = (aggregate_t){PearsonCorrelation, k};
+                if (P[i] > aggregate_m[k].value)
+                    aggregate_m[k] = (aggregate_t){P[i], stage * t + k + i};
+                if (P[i] > aggregate_m[stage * t + k + i].value)
+                    aggregate_m[stage * t + k + i] = (aggregate_t){P[i], k};
             }
         }
     }
