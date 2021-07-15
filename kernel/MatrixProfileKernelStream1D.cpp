@@ -9,7 +9,6 @@
     #include "kernel/MatrixProfileKernel.hpp"
     
     #include "hls_math.h"
-    #include "kernel/HLSMathUtil.hpp"
 
     #include "hls_stream.h"
     using hls::stream;
@@ -53,7 +52,7 @@ void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &QT, stream
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
     }
-    data_t inv = static_cast<data_t>(1) / sqrt(inv_sum);
+    data_t inv = static_cast<data_t>(1) / static_cast<data_t>(sqrt(inv_sum));
     const data_t inv0 = inv;
 
     QT.write(qt_sum);

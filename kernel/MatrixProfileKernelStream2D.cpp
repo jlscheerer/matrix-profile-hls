@@ -127,6 +127,8 @@ void PrimaryDiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t
         stream<data_t, stream_d> &sInv_out) {
     // local "cache" for time series values for the current row/column
     data_t Ti_m[m], Tj_m[t + m - 1];
+    #pragma HLS ARRAY_PARTITION variable=Ti_m complete
+    #pragma HLS ARRAY_PARTITION variable=Tj_m complete
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
@@ -137,7 +139,6 @@ void PrimaryDiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t
     // local "cache" for inverses for the current row/column
     data_t invi_m[t], invj_m[2 * t - 1];
 
-    // factor=3 required for fadd and fmul (update if data_t changes)
     aggregate_t rowAggregate[t], columnAggregate[2 * t - 1];
     // =============== [Scatter] ===============
     data_t mu = 0, df = 0, dg = 0, inv = 0;
@@ -314,6 +315,8 @@ void DiagonalComputeElement(index_t yStage, index_t xStage, stream<data_t, strea
         stream<aggregate_t, stream_d> &rowAggregate_out, stream<aggregate_t, stream_d> &columnAggregate_out) {
     // local "cache" for time series values for the current row/column
     data_t Ti_m[m], Tj_m[t + m - 1];
+    #pragma HLS ARRAY_PARTITION variable=Ti_m complete
+    #pragma HLS ARRAY_PARTITION variable=Tj_m complete
 
     // local "cache" for means for the current row/column
     data_t mui_m = 0, muj_m[t];
