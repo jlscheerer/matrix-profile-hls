@@ -63,15 +63,12 @@ void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &QT, stream
 
     PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
-        #pragma HLS PIPELINE II=1
         data_t Ti = T[i];
         data_t Tm = T_m[0];
 
-        // recompute mean to achieve II=1
         mean = 0;
         PrecomputationComputeUpdateMean:
         for(index_t k = 1; k < m; ++k) {
-            #pragma HLS UNROLL
             mean += T_m[k];
         }
         data_t prev_mean = mean;
@@ -81,7 +78,6 @@ void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &QT, stream
         inv_sum = 0; qt_sum = 0;
         PrecomputationComputeUpdateInvQT:
         for (index_t k = 1; k < m; ++k) {
-            #pragma HLS UNROLL
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
         }
