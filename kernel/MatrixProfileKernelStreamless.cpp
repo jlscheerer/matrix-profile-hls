@@ -26,8 +26,6 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     data_t QT[sublen], P[sublen];
 
     aggregate_t rowAggregate[sublen], columnAggregate[sublen];
-    #pragma HLS ARRAY_PARTITION variable=columnAggregate cyclic factor=3
-
     // =============== [Precompute] ===============
     // use T_m as shift register containing the previous m T elements
     // need to be able to access these elements with no contention
