@@ -36,29 +36,22 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     data_t Ti_m[m];
     #pragma HLS ARRAY_PARTITION variable=Ti_m complete
 
-    PrecomputationInitT:
+    data_t mean = 0, inv_sum = 0, qt_sum = 0;
+    PrecomputationInitTMu:
     for (index_t i = 0; i < m; ++i) {
-        #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
+        mean += T_i;
         T_m[i] = T_i;
         Ti_m[i] = T_i;
-    }
-
-    data_t mean = 0;
-    PrecomputationInitMu:
-    for(index_t i = 0; i < m; ++i){
-        #pragma HLS UNROLL
-        mean += T_m[i];
     }
     mean /= m;
 
     // calculate initial values
-    data_t mu0 = mean; mu[0] = mu0; df[0] = 0; dg[0] = 0;
+    data_t mu0 = mean; 
+    mu[0] = mu0; df[0] = 0; dg[0] = 0;
 
-    data_t inv_sum = 0, qt_sum = 0;
     PrecomputationInitInvQT:
     for (index_t k = 0; k < m; ++k) {
-        #pragma HLS UNROLL
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
     }
@@ -71,35 +64,23 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
     // Maximum PearsonCorrelation and corresponding Index for the first row
     aggregate_t rowAggregate_m = aggregate_t_init;
-
     PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
         #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
-        // recompute mean to achieve II=1
-        mean = 0;
-        PrecomputationComputeUpdateMean:
-        for(index_t k = 1; k < m; ++k) {
-            #pragma HLS UNROLL
-            mean += T_m[k];
-        }
         data_t prev_mean = mean;
-        prev_mean += T_r; prev_mean /= m;
-        mean += T_i; mean /= m;
+        mean += (T_i - T_r) / m;
 
         // calculate df: (T[i+m-1] - T[i-1]) / 2
         df[i - m + 1] = (T_i - T_r) / 2;
         // calculate dg: (T[i+m-1] - μ[i]) * (T[i-1] - μ[i-1])
         dg[i - m + 1] = (T_i - mean) + (T_r - prev_mean);
 
-        inv_sum = 0;
-        qt_sum = 0;
-
+        inv_sum = 0; qt_sum = 0;
         PrecomputationComputeUpdateInvQT:
         for (index_t k = 1; k < m; k++) {
-            #pragma HLS UNROLL
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
         }
@@ -110,24 +91,22 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
         qt_sum += (T_i - mean) * (Ti_m[m - 1] - mu0);
         QT[i - m + 1] = qt_sum;
+
         // calculate Pearson Correlation: P_{i, j} = QT_{i, j} * inv_i * inv_j
         P[i - m + 1] = qt_sum * inv0 * (static_cast<data_t>(1) / sqrt(inv_sum));
 
-        rowAggregate[i - m + 1] = aggregate_t_init;
-        
         bool exclusionZone = (i - m + 1) < m / 4;
         if(!exclusionZone) columnAggregate[i - m + 1] = {P[i - m + 1], 0};
         else columnAggregate[i - m + 1] = aggregate_t_init;
 
+        rowAggregate[i - m + 1] = aggregate_t_init;
         if (!exclusionZone && P[i - m + 1] > rowAggregate_m.value)
             rowAggregate_m = {P[i - m + 1], static_cast<index_t>(i - m + 1)};
 
         // shift all values in T_m back
         PrecomputationComputeShift: 
-        for (index_t k = 0; k < m - 1; ++k){
-            #pragma HLS UNROLL
+        for (index_t k = 0; k < m - 1; ++k)
             T_m[k] = T_m[k + 1];
-        }
         T_m[m - 1] = T_i;
     }
 
