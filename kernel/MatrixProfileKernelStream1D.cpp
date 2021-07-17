@@ -9,102 +9,23 @@
     #include "kernel/MatrixProfileKernel.hpp"
     
     #include "hls_math.h"
-
     #include "hls_stream.h"
     using hls::stream;
 #endif
 
 static constexpr size_t stream_d = 3;
-
-void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &QT, stream<data_t, stream_d> &df_s, stream<data_t, stream_d> &dg_s,
-                    stream<data_t, stream_d> &inv_s, stream<aggregate_t, stream_d> &scatterLane, stream<aggregate_t, stream_d> &reductionLane) {
-    // store the previous (m-1) T-values in local "cache" (acts as shift-register)
-    data_t T_m[m];
-    #pragma HLS ARRAY_PARITION variable=T_m complete
-
-    // store the first m T values in local "cache" (required for convolution)
-    data_t Ti_m[m];
-    #pragma HLS ARRAY_PARITION variable=Ti_m complete
-
-    data_t inv_sum = 0;
-    data_t qt_sum = 0;
-
-    PrecomputationInitT:
-    for (index_t i = 0; i < m; ++i) {
-        #pragma HLS PIPELINE II=1
-        data_t T_i = T[i];
-        T_m[i] = T_i;
-        Ti_m[i] = T_i;
+void MemoryToStreamElement(const data_t *QT, const data_t *df, const data_t *dg, const data_t *inv, 
+                           stream<data_t, stream_d> &QT_s, stream<data_t, stream_d> &df_s, stream<data_t, stream_d> &dg_s,
+                           stream<data_t, stream_d> &inv_s,  stream<aggregate_t,  stream_d> &scatterLane, stream<aggregate_t, stream_d> &reductionLane) {
+    // =============== [Scatter] ===============
+    for (index_t i = 0; i < n - m + 1; ++i) {
+        QT_s.write(QT[i]);
+        df_s.write(df[i]);
+        dg_s.write(dg[i]);
+        inv_s.write(inv[i]);
+        scatterLane.write(aggregate_t_init);
     }
-
-    data_t mean = 0;
-    PrecomputationInitMu:
-    for (index_t i = 0; i < m; ++i) {
-        #pragma HLS UNROLL
-        mean += T_m[i];
-    }
-    mean /= m;
-    const data_t mu0 = mean;
-
-    PrecomputationInitInvQT:
-    for (index_t k = 0; k < m; ++k) {
-        #pragma HLS UNROLL
-        inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
-        qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
-    }
-    data_t inv = static_cast<data_t>(1) / static_cast<data_t>(sqrt(inv_sum));
-    const data_t inv0 = inv;
-
-    QT.write(qt_sum);
-    df_s.write(0); dg_s.write(0); inv_s.write(inv);
-
-    // Will always be 1 & contained in the exclusionZone
-    scatterLane.write(aggregate_t_init);
-
-    PrecomputationCompute:
-    for (index_t i = m; i < n; ++i) {
-        data_t Ti = T[i];
-        data_t Tm = T_m[0];
-
-        mean = 0;
-        PrecomputationComputeUpdateMean:
-        for(index_t k = 1; k < m; ++k) {
-            mean += T_m[k];
-        }
-        data_t prev_mean = mean;
-        prev_mean += Tm; prev_mean /= m;
-        mean += Ti; mean /= m;
-
-        inv_sum = 0; qt_sum = 0;
-        PrecomputationComputeUpdateInvQT:
-        for (index_t k = 1; k < m; ++k) {
-            inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
-            qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
-        }
-        qt_sum += (Ti - mean) * (Ti_m[m - 1] - mu0);
-        inv_sum += (Ti - mean) * (Ti - mean);
-        inv = static_cast<data_t>(1) / sqrt(inv_sum);
-
-        // calculate df: (T[i+m-1] - T[i-1]) / 2
-        data_t df = (Ti - Tm) / 2;
-
-        // calculate dg: (T[i+m-1] - μ[i]) * (T[i-1] - μ[i-1])
-        data_t dg = (Ti - mean) + (Tm - prev_mean);
-
-        QT.write(qt_sum);
-        df_s.write(df); dg_s.write(dg); inv_s.write(inv);
-
-        bool exclusionZone = (i - m + 1 < m/4);
-        scatterLane.write(!exclusionZone ? (aggregate_t){qt_sum * inv * inv0, 0} : aggregate_t_init);
-
-        // shift all values in T_m back
-        PrecomputationComputeShift:
-        for (index_t k = 0; k < m - 1; ++k) {
-            #pragma HLS UNROLL
-            T_m[k] = T_m[k + 1];
-        }
-        T_m[m - 1] = Ti;
-    }
+    // =============== [/Scatter] ===============
 
     // =============== [Reduce] ===============
     PrecomputationInitReduce:
@@ -220,7 +141,8 @@ void StreamToMemoryElement(stream<data_t, stream_d> &QT, stream<data_t, stream_d
     }
 }
 
-void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
+void MatrixProfileKernelTLF(const data_t *QT, const data_t *df, const data_t *dg,
+                            const data_t *inv, data_t *MP, index_t *MPI) {
     #pragma HLS INTERFACE m_axi port=T   offset=slave bundle=gmem0
     #pragma HLS INTERFACE m_axi port=MP  offset=slave bundle=gmem1
     #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem2
@@ -230,19 +152,19 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     constexpr index_t numStages = (n - m + 1 + t - 1) / t;
 
     // Streams required to calculate Correlations
-    stream<data_t, stream_d> QT[numStages + 1];
-    stream<data_t, stream_d> df[numStages + 1], dg[numStages + 1], inv[numStages + 1];
+    stream<data_t, stream_d> QT_s[numStages + 1];
+    stream<data_t, stream_d> df_s[numStages + 1], dg_s[numStages + 1], inv_s[numStages + 1];
 
     // Store the intermediate results
     stream<aggregate_t, stream_d> scatterLane[numStages + 1], reductionLane[numStages + 1];
 
-    MemoryToStreamElement(T, QT[0], df[0], dg[0], inv[0], scatterLane[0], reductionLane[0]);
+    MemoryToStreamElement(QT, df, dg, inv, QT_s[0], df_s[0], dg_s[0], inv_s[0], scatterLane[0], reductionLane[0]);
 
     for (index_t stage = 0; stage < numStages; ++stage) {
         #pragma HLS UNROLL
-        DiagonalComputeElement(stage, QT[stage], df[stage], dg[stage], inv[stage], scatterLane[stage], reductionLane[stage], QT[stage + 1],
-                               df[stage + 1], dg[stage + 1], inv[stage + 1], scatterLane[stage + 1], reductionLane[stage + 1]);
+        DiagonalComputeElement(stage, QT_s[stage], df_s[stage], dg_s[stage], inv_s[stage], scatterLane[stage], reductionLane[stage], 
+                               QT_s[stage + 1], df_s[stage + 1], dg_s[stage + 1], inv_s[stage + 1], scatterLane[stage + 1], reductionLane[stage + 1]);
     }
 
-    StreamToMemoryElement(QT[numStages], df[numStages], dg[numStages], inv[numStages], scatterLane[numStages], reductionLane[numStages], MP, MPI);
+    StreamToMemoryElement(QT_s[numStages], df_s[numStages], dg_s[numStages], inv_s[numStages], scatterLane[numStages], reductionLane[numStages], MP, MPI);
 }
