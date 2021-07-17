@@ -31,7 +31,6 @@ void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &QT, stream
 
     PrecomputationInitT:
     for (index_t i = 0; i < m; ++i) {
-        #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
         T_m[i] = T_i;
         Ti_m[i] = T_i;
@@ -40,7 +39,6 @@ void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &QT, stream
     data_t mean = 0;
     PrecomputationInitMu:
     for (index_t i = 0; i < m; ++i) {
-        #pragma HLS UNROLL
         mean += T_m[i];
     }
     mean /= m;
@@ -48,7 +46,6 @@ void MemoryToStreamElement(const data_t *T, stream<data_t, stream_d> &QT, stream
 
     PrecomputationInitInvQT:
     for (index_t k = 0; k < m; ++k) {
-        #pragma HLS UNROLL
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
         qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
     }
@@ -123,7 +120,7 @@ void DiagonalComputeElement(const index_t stage, stream<data_t, stream_d> &QT_in
     data_t df_m[n - m + 1], dg_m[n - m + 1], inv_m[n - m + 1];
     
     data_t QT[t], P[t];
-    aggregate_t rowAggregate[n - m + 1], columnAggregate[n - m + 1];
+    aggregate_t aggregate_m[n - m + 1];
 
     // =============== [Scatter] ===============
     MatrixProfileScatter:
@@ -139,8 +136,7 @@ void DiagonalComputeElement(const index_t stage, stream<data_t, stream_d> &QT_in
             QT[k - t * stage] = QTforward;
         
         df_m[k] = dfi; dg_m[k] = dgi; inv_m[k] = invi;
-        rowAggregate[k] = aggregate;
-        columnAggregate[k] = aggregate;
+        aggregate_m[k] = aggregate;
 
         // forward values to subsequent processing elements
         QT_out.write(QTforward);
@@ -168,10 +164,10 @@ void DiagonalComputeElement(const index_t stage, stream<data_t, stream_d> &QT_in
             const bool exclusionZone = stage * t + i < m / 4;
 
             if (computationInRange && !exclusionZone) {
-                if (P[i] > rowAggregate[k].value)
-                    rowAggregate[k] = (aggregate_t){P[i], stage * t + k + i};
-                if (P[i] > columnAggregate[stage * t + k + i].value)
-                    columnAggregate[stage * t + k + i] = (aggregate_t){P[i], k};
+                if (P[i] > aggregate_m[k].value)
+                    aggregate_m[k] = (aggregate_t){P[i], stage * t + k + i};
+                if (P[i] > aggregate_m[stage * t + k + i].value)
+                    aggregate_m[stage * t + k + i] = (aggregate_t){P[i], k};
             }
         }
     }
@@ -185,8 +181,7 @@ void DiagonalComputeElement(const index_t stage, stream<data_t, stream_d> &QT_in
         // get previous aggregate from predecessor
         aggregate_t prevAggregate = reductionLane_in.read();
         // merge row and column aggregates
-        aggregate_t currAggregate = (columnAggregate[k].value > rowAggregate[k].value) 
-                                    ? columnAggregate[k] : rowAggregate[k];
+        aggregate_t currAggregate = aggregate_m[k];
         if (currAggregate.value > prevAggregate.value)
             reductionLane_out.write(currAggregate);
         else reductionLane_out.write(prevAggregate);
