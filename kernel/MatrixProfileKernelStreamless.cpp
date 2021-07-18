@@ -25,7 +25,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     data_t mu[sublen], df[sublen], dg[sublen], inv[sublen];
     data_t QT[sublen], P[sublen];
 
-    aggregate_t rowAggregate[sublen], columnAggregate[sublen];
+    aggregate_t aggregate_m[sublen];
     // =============== [Precompute] ===============
     // use T_m as shift register containing the previous m T elements
     // need to be able to access these elements with no contention
@@ -60,13 +60,12 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     inv[0] = inv0; QT[0] = qt_sum; P[0] = 1;
 
     // Assumption: will always be in the exclusionZone
-    columnAggregate[0] = aggregate_t_init;
+    aggregate_m[0] = aggregate_t_init;
 
     // Maximum PearsonCorrelation and corresponding Index for the first row
     aggregate_t rowAggregate_m = aggregate_t_init;
     PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
-        #pragma HLS PIPELINE II=1
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
@@ -96,10 +95,9 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         P[i - m + 1] = qt_sum * inv0 * (static_cast<data_t>(1) / sqrt(inv_sum));
 
         bool exclusionZone = (i - m + 1) < m / 4;
-        if(!exclusionZone) columnAggregate[i - m + 1] = {P[i - m + 1], 0};
-        else columnAggregate[i - m + 1] = aggregate_t_init;
+        if(!exclusionZone) aggregate_m[i - m + 1] = {P[i - m + 1], 0};
+        else aggregate_m[i - m + 1] = aggregate_t_init;
 
-        rowAggregate[i - m + 1] = aggregate_t_init;
         if (!exclusionZone && P[i - m + 1] > rowAggregate_m.value)
             rowAggregate_m = {P[i - m + 1], static_cast<index_t>(i - m + 1)};
 
@@ -111,7 +109,8 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     }
 
     // set the aggregates for the first row
-    rowAggregate[0] = rowAggregate_m;
+    if (rowAggregate_m.value > aggregate_m[0].value)
+        aggregate_m[0] = rowAggregate_m;
     // =============== [/Precompute] ===============
 
     // =============== [/Compute] ===============
@@ -128,9 +127,9 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
             data_t dfi = df[k], dgi = dg[k], invi = inv[k];
 
             const bool computationInRange = k + i < sublen;
-            data_t dfj = computationInRange ? df[k + i] : static_cast<data_t>(0);
-            data_t dgj = computationInRange ? dg[k + i] : static_cast<data_t>(0);
-            data_t invj = computationInRange ? inv[k + i] : static_cast<data_t>(0);
+            const data_t dfj = computationInRange ? df[k + i] : static_cast<data_t>(0);
+            const data_t dgj = computationInRange ? dg[k + i] : static_cast<data_t>(0);
+            const data_t invj = computationInRange ? inv[k + i] : static_cast<data_t>(0);
 
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
@@ -142,10 +141,10 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
             // Update Aggregates
             const index_t column = k + i;
-            if(computationInRange && P[i] > columnAggregate[column].value)
-                columnAggregate[column] = {P[i], static_cast<index_t>(k)};
-            if(computationInRange && P[i] > rowAggregate[k].value)
-                rowAggregate[k] = {P[i], static_cast<index_t>(column)};
+            if(computationInRange && P[i] > aggregate_m[k].value)
+                aggregate_m[k] = {P[i], static_cast<index_t>(column)};
+            if(computationInRange && P[i] > aggregate_m[column].value)
+                aggregate_m[column] = {P[i], static_cast<index_t>(k)};
         }
     }
     // =============== [/Compute] ===============
@@ -155,10 +154,9 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     ReductionCompute:
     for (index_t i = 0; i < sublen; ++i) {
         #pragma HLS PIPELINE II=1
-        aggregate_t rowAggregate_m = rowAggregate[i], columnAggregate_m = columnAggregate[i];
         // Take the max and compute EuclideanDistance
-        MP[i]  = PearsonCorrelationToEuclideanDistance(rowAggregate_m.value > columnAggregate_m.value ? rowAggregate_m.value : columnAggregate_m.value);
-        MPI[i] = rowAggregate_m.value > columnAggregate_m.value ? rowAggregate_m.index : columnAggregate_m.index;
+        MP[i]  = PearsonCorrelationToEuclideanDistance(aggregate_m[i].value);
+        MPI[i] = aggregate_m[i].index;
     }
     // =============== [/Reduce] ===============
 }
