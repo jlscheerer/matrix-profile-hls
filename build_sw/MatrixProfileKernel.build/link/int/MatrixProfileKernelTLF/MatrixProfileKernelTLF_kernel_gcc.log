@@ -1,6 +1,0 @@
-In file included from /opt/Xilinx/Vitis_HLS/2020.2/bin/../include/hls_hotbm_apfixed.h:45:0,
-                 from /opt/Xilinx/Vitis_HLS/2020.2/bin/../include/hls_math.h:1065,
-                 from /home/jscheerer/matrix-profile-hls/build_sw/MatrixProfileKernel.build/link/int/xo/MatrixProfileKernelTLF/MatrixProfileKernelTLF/cpu_sources/MatrixProfileKernelStreamless.cpp:11:
-/opt/Xilinx/Vitis_HLS/2020.2/bin/../include/utils/x_hls_utils.h:243:40: warning: ‘hls_preserve’ attribute directive ignored [-Wattributes]
- __attribute__((hls_preserve)) T reg(T d)
-                                        ^
