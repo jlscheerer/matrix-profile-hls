@@ -24,7 +24,7 @@ namespace MatrixProfileTests {
             data_t value;
             index_t index;
         };
-
+        using ComputePack = typename MatrixProfileKernel<data_t, index_t, n, m>::ComputePack;
         #include "MatrixProfileKernelStreamless.cpp"
     };
 
@@ -33,6 +33,7 @@ namespace MatrixProfileTests {
         TestMatrixProfileKernel(kernel, "synthetic/small8_syn.txt");
     }
 
+    /*
     TEST(TestStreamlessKernel, TestSmall16SynM4) {
         StreamlessKernel<double, int, 16, 4> kernel;
         TestMatrixProfileKernel(kernel, "synthetic/small16_syn.txt");
@@ -52,5 +53,6 @@ namespace MatrixProfileTests {
         StreamlessKernel<double, int, 1024, 20> kernel;
         TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
     }
+    */
 
 }

@@ -23,6 +23,7 @@ namespace MatrixProfileUtil {
                             : static_cast<data_t>(0);
             dg[i] = (i > 0) ? ((T[i + m - 1] - mean) + (T[i - 1] - prev_mu)) 
                             : static_cast<data_t>(0);
+            QT[i] = 0; inv[i] = 0;
             for (index_t k = 0; k < m; ++k) {
                 QT[i]  += (T[i + k] - mean) * (T[k] - mu0);
                 inv[i] += (T[i + k] - mean) * (T[i + k] - mean);

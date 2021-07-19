@@ -26,8 +26,8 @@ set(MP_ROOT_FS "/u/home/raoofy/xilinx-zynqmp-common-v2020.1/rootfs.ext4" CACHE S
 set(MP_KERNEL_IMAGE "/u/home/raoofy/xilinx-zynqmp-common-v2020.1/Image" CACHE STRING "Application settings: Kernel Image")
 
 # Matrix Profile Computation Options
-set(VALID_KERNELS Streamless Stream1D Stream2D)
-set(MP_KERNEL "Stream2D" CACHE STRING "implementation to use for the matrix profile kernel {Streamless, Stream1D, Stream2D}")
+set(VALID_KERNELS Streamless Stream1D)
+set(MP_KERNEL "Stream1D" CACHE STRING "implementation to use for the matrix profile kernel {Streamless, Stream1D}")
 set_property(CACHE MP_KERNEL PROPERTY STRINGS ${VALID_KERNELS})
 
 set(VALID_DATA_TYPES double float ap16_t ap24_t ap32_t ap64_t)
@@ -40,7 +40,7 @@ set_property(CACHE MP_INDEX_TYPE PROPERTY STRINGS ${VALID_INDEX_TYPES})
 
 set(MP_SIZE_N 8 CACHE STRING "length of the time series data")
 set(MP_SIZE_M 4 CACHE STRING "subsequence length for the matrix profile")
-set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream1D/Stream2D) [assumption: t ≥ m]")
+set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream1D) [assumption: t ≥ m]")
 
 # Custom option to enable software testing using google-test
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
@@ -56,7 +56,7 @@ endif()
 
 list(FIND VALID_KERNELS ${MP_KERNEL} kernel_index)
 if(kernel_index EQUAL -1)
-    message(FATAL_ERROR "The specified value for 'MP_KERNEL' [\"${MP_KERNEL}\"] is invalid.\nKernel has to be one of 'Streamless', 'Stream1D' or 'Stream2D'.")
+    message(FATAL_ERROR "The specified value for 'MP_KERNEL' [\"${MP_KERNEL}\"] is invalid.\nKernel has to be one of 'Streamless', 'Stream1D'.")
 endif()
 
 list(FIND VALID_DATA_TYPES ${MP_DATA_TYPE} data_type_index)
@@ -141,40 +141,6 @@ else()
 endif()
 
 set(VITIS_COMPILER "$ENV{XILINX_VITIS}/bin/v++")
-
-if("${MP_KERNEL}" STREQUAL "Stream2D")
-    # Generate Completely Unrolled Loop Code
-    MATH(EXPR nTiles "((${MP_SIZE_N}-${MP_SIZE_M}+${MP_SIZE_T}) / ${MP_SIZE_T})")
-    function(index2D x y)
-        MATH(EXPR index "(${nTiles} * (${nTiles} - 1)) / 2 - ((${nTiles} - ${y}) * (${nTiles} - ${y} - 1)) / 2 + ${x}")
-        set(index ${index} PARENT_SCOPE)
-    endfunction()
-
-    MATH(EXPR nTiles_1 "${nTiles} - 1")
-    foreach(y RANGE "${nTiles_1}")
-        index2D(${y} ${y})
-        MATH(EXPR y_1 "${y} + 1")
-        set(Stream2DInitSource "${Stream2DInitSource}PrimaryDiagonalComputeElement(${y}, ${y}, sT[${y}], sMu[${y}], sDf[${y}], sDg[${y}], sInv[${y}], Ti[${index}], Tj[${index}], 
-                        mui[${index}], muj[${index}], dfi[${index}], dfj[${index}], dgi[${index}], dgj[${index}], invi[${index}], invj[${index}], 
-                        rowAggregate[${index}], columnAggregate[${index}], sT[${y_1}], sMu[${y_1}], sDf[${y_1}], sDg[${y_1}], sInv[${y_1}]);\n\n")
-        if(NOT (${nTiles_1} LESS ${y_1}))
-            foreach(x RANGE ${y_1} ${nTiles_1})
-                index2D(${x} ${y})
-                MATH(EXPR index_1 "${index} - 1")
-                set(Stream2DInitSource "${Stream2DInitSource}DiagonalComputeElement(${y}, ${x}, Ti[${index_1}], Tj[${index_1}], mui[${index_1}], muj[${index_1}],
-                            dfi[${index_1}], dfj[${index_1}], dgi[${index_1}], dgj[${index_1}], invi[${index_1}],
-                            invj[${index_1}], rowAggregate[${index_1}], columnAggregate[${index_1}], Ti[${index}],
-                            Tj[${index}], mui[${index}], muj[${index}], dfi[${index}], dfj[${index}], dgi[${index}], dgj[${index}], 
-                            invi[${index}], invj[${index}], rowAggregate[${index}], columnAggregate[${index}]);\n\n")
-            endforeach()
-        endif()
-
-        index2D(${nTiles_1} ${y})
-        set(Stream2DInitSource "${Stream2DInitSource}ReductionElement(${y}, rRow[${y}], rCol[${y}], rowAggregate[${index}], columnAggregate[${index}], rRow[${y_1}], rCol[${y_1}]);\n\n")
-    endforeach()
-    # Write Generated Code to File (will be included in the Stream2D)
-    configure_file(include/kernel/Stream2DInit.hpp.in kernel/Stream2DInit.hpp)
-endif()
 
 # Host Application (Compile & Link)
 if(MP_EMBEDDED)
@@ -305,12 +271,8 @@ if(BUILD_TESTS)
     add_executable(testStream1DKernel "${PROJECT_SOURCE_DIR}/test/TestStream1DKernel.cpp")
     target_link_libraries(testStream1DKernel gtest gtest_main)
 
-    add_executable(testStream2DKernel "${PROJECT_SOURCE_DIR}/test/TestStream2DKernel.cpp")
-    target_link_libraries(testStream2DKernel gtest gtest_main)
-
     # This is so you can do 'make test' to see all tests run, instead of
     # manually running the executable runUnitTests to see those specific tests.
     add_test(NAME TestStreamlessKernel COMMAND testStreamlessKernel)
     add_test(NAME TestStream1DKernel COMMAND testStream1DKernel)
-    add_test(NAME TestStream2DKernel COMMAND testStream2DKernel)
 endif()

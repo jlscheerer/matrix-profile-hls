@@ -25,6 +25,7 @@ namespace MatrixProfileTests {
             index_t index;
         };
 
+        using ComputePack = typename MatrixProfileKernel<data_t, index_t, n, m>::ComputePack;
         #include "MatrixProfileKernelStream1D.cpp"
     };
 

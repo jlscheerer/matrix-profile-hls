@@ -21,7 +21,6 @@ static constexpr index_t n = ${MP_SIZE_N};
 // subsequence length for the matrix profile
 static constexpr index_t m = ${MP_SIZE_M};
 
-// "tile-size" (only applicable for Stream2D)
 // assumption: t ≥ m
 static constexpr index_t t = ${MP_SIZE_T};
 
