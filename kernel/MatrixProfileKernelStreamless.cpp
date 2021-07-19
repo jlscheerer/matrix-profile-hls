@@ -26,10 +26,6 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
         columnAggregate[i] = aggregate_t_init;
     }
 
-    for (int i = 0; i < n - m + 1; ++i)
-        std::cout << "inv: "  << data[i].inv << " ";
-    std::cout << std::endl;
-
     // =============== [/Compute] ===============
     // Do the actual calculations via updates
     MatrixProfileComputeRow:

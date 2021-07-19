@@ -143,7 +143,7 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
     // Store the intermediate results
     stream<aggregate_t, stream_d> scatterLane[numStages + 1], reductionLane[numStages + 1];
 
-    MemoryToStreamElement(QT, data, QT_s[0], data_s[0], scatterLane[0], reductionLane[0]);
+    MemoryToStreamElement(QTInit, data, QT_s[0], data_s[0], scatterLane[0], reductionLane[0]);
 
     for (index_t stage = 0; stage < numStages; ++stage) {
         #pragma HLS UNROLL

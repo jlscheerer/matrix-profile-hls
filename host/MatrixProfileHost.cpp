@@ -64,8 +64,8 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     OpenCL::Buffer<data_t, Access::ReadOnly> buffer_QT{
         context.MakeBuffer<data_t, Access::ReadOnly>(MemoryBank::MemoryBank0, n - m + 1)
     };
-    OpenCL::Buffer<data_t, Access::ReadOnly> buffer_data{
-        context.MakeBuffer<data_t, Access::ReadOnly>(MemoryBank::MemoryBank1, n - m + 1)
+    OpenCL::Buffer<ComputePack, Access::ReadOnly> buffer_data{
+        context.MakeBuffer<ComputePack, Access::ReadOnly>(MemoryBank::MemoryBank1, n - m + 1)
     };
     OpenCL::Buffer<data_t, Access::WriteOnly> buffer_MP{
         context.MakeBuffer<data_t, Access::WriteOnly>(MemoryBank::MemoryBank0, n - m + 1)
@@ -98,7 +98,7 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     buffer_MPI.CopyToHost(host_MPI.data());
 
     Log<LogLevel::Info>("Converting Pearson Correlation to Euclidean Distance");
-    HostSideComputation::PearsonCorrelationToEuclideanDistance(MP);
+    HostSideComputation::PearsonCorrelationToEuclideanDistance(host_MP);
 
     if(output){
         Log<LogLevel::Verbose>("Saving results (MP/MPI) to file...");

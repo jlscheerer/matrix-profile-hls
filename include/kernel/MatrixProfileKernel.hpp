@@ -6,8 +6,9 @@
 
 #pragma once
 
+#include "Config.hpp"
+
 struct aggregate_t { data_t value; index_t index; };
-struct ComputePack { data_t df, dg, inv; };
 
 static const aggregate_t aggregate_t_init{aggregate_init, index_init};
 
