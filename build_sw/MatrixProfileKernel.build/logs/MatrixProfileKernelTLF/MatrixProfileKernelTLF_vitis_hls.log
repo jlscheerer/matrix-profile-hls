@@ -1,0 +1,79 @@
+
+****** Vitis HLS - High-Level Synthesis from C, C++ and OpenCL v2020.2 (64-bit)
+  **** SW Build 3064766 on Wed Nov 18 09:12:47 MST 2020
+  **** IP Build 3064653 on Wed Nov 18 14:17:31 MST 2020
+    ** Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+
+source /opt/Xilinx/Vitis_HLS/2020.2/scripts/vitis_hls/hls.tcl -notrace
+INFO: [HLS 200-10] Running '/opt/Xilinx/Vitis_HLS/2020.2/bin/unwrapped/lnx64.o/vitis_hls'
+INFO: [HLS 200-10] For user 'jscheerer' on host 'alveo0.ethz.ch' (Linux_x86_64 version 4.14.156-U) on Mon Jul 19 17:48:59 CEST 2021
+INFO: [HLS 200-10] On os Ubuntu 18.04.3 LTS
+INFO: [HLS 200-10] In directory '/home/jscheerer/matrix-profile-hls/build_sw/MatrixProfileKernel.build/MatrixProfileKernelTLF/MatrixProfileKernelTLF'
+Sourcing Tcl script 'MatrixProfileKernelTLF.tcl'
+INFO: [HLS 200-1510] Running: open_project MatrixProfileKernelTLF 
+INFO: [HLS 200-10] Creating and opening project '/home/jscheerer/matrix-profile-hls/build_sw/MatrixProfileKernel.build/MatrixProfileKernelTLF/MatrixProfileKernelTLF/MatrixProfileKernelTLF'.
+INFO: [HLS 200-1510] Running: set_top MatrixProfileKernelTLF 
+INFO: [HLS 200-1510] Running: add_files /home/jscheerer/matrix-profile-hls/kernel/MatrixProfileKernelStreamless.cpp -cflags  -g -I /home/jscheerer/matrix-profile-hls/build_sw -I /home/jscheerer/matrix-profile-hls/kernel -I /home/jscheerer/matrix-profile-hls/include  
+INFO: [HLS 200-10] Adding design file '/home/jscheerer/matrix-profile-hls/kernel/MatrixProfileKernelStreamless.cpp' to the project
+INFO: [HLS 200-1510] Running: open_solution -flow_target vitis solution 
+INFO: [HLS 200-10] Creating and opening solution '/home/jscheerer/matrix-profile-hls/build_sw/MatrixProfileKernel.build/MatrixProfileKernelTLF/MatrixProfileKernelTLF/MatrixProfileKernelTLF/solution'.
+INFO: [HLS 200-1505] Using flow_target 'vitis'
+Resolution: For help on HLS 200-1505 see www.xilinx.com/cgi-bin/docs/rdoc?v=2020.2;t=hls+guidance;d=200-1505.html
+INFO: [HLS 200-435] Setting 'open_solution -flow_target vitis' configuration: config_interface -m_axi_latency=64
+INFO: [HLS 200-435] Setting 'open_solution -flow_target vitis' configuration: config_interface -m_axi_alignment_byte_size=64
+INFO: [HLS 200-435] Setting 'open_solution -flow_target vitis' configuration: config_interface -m_axi_max_widen_bitwidth=512
+INFO: [HLS 200-435] Setting 'open_solution -flow_target vitis' configuration: config_interface -m_axi_offset=slave
+INFO: [HLS 200-435] Setting 'open_solution -flow_target vitis' configuration: config_rtl -register_reset_num=3
+INFO: [HLS 200-1510] Running: set_part xcu250-figd2104-2L-e 
+INFO: [HLS 200-10] Setting target device to 'xcu250-figd2104-2L-e'
+INFO: [HLS 200-1510] Running: create_clock -period 300.000000MHz -name default 
+INFO: [SYN 201-201] Setting up clock 'default' with a period of 3.333ns.
+INFO: [HLS 200-1510] Running: config_rtl -kernel_profile 
+INFO: [HLS 200-1510] Running: config_dataflow -strict_mode warning 
+INFO: [HLS 200-1510] Running: config_debug -enable 
+INFO: [HLS 200-1510] Running: config_export -disable_deadlock_detection=true 
+INFO: [HLS 200-1510] Running: config_rtl -m_axi_conservative_mode=1 
+WARNING: [HLS 200-483] The 'config_rtl -m_axi_conservative_mode' command is deprecated and will be removed in a future release. Use 'config_interface -m_axi_conservative_mode' as its replacement.
+INFO: [HLS 200-1510] Running: config_interface -m_axi_addr64 
+INFO: [HLS 200-1510] Running: config_interface -m_axi_auto_max_ports=0 
+INFO: [HLS 200-1510] Running: config_export -format ip_catalog -ipname MatrixProfileKernelTLF 
+INFO: [HLS 200-1510] Running: csynth_design -synthesis_check 
+INFO: [HLS 200-111] Finished File checks and directory preparation: CPU user time: 0.02 seconds. CPU system time: 0 seconds. Elapsed time: 0.02 seconds; current allocated memory: 189.897 MB.
+INFO: [HLS 200-10] Analyzing design file '/home/jscheerer/matrix-profile-hls/kernel/MatrixProfileKernelStreamless.cpp' ... 
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:117:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:118:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:119:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:120:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:121:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:151:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:152:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:153:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:154:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:155:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:156:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:157:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:158:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:159:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:160:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:210:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:211:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:212:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:239:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:240:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:241:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:242:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:243:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:244:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:280:9
+WARNING: [HLS 207-5510] 'Resource pragma' is deprecated, and it will be removed in future release. It is suggested to replace it with 'bind_op/bind_storage pragma'.: /opt/Xilinx/Vitis_HLS/2020.2/common/technology/autopilot/hls_hotbm_apfixed.h:281:9
+INFO: [HLS 200-111] Finished Source Code Analysis and Preprocessing: CPU user time: 10.75 seconds. CPU system time: 0.65 seconds. Elapsed time: 11.33 seconds; current allocated memory: 191.265 MB.
+INFO: [HLS 200-777] Using interface defaults for 'Vitis' flow target.
+INFO: [HLS 214-131] Inlining function 'aggregate_t::operator>(aggregate_t) const' into 'MatrixProfileKernelTLF' (/home/jscheerer/matrix-profile-hls/kernel/MatrixProfileKernelStreamless.cpp:74:48)
+INFO: [HLS 214-178] Inlining function 'aggregate_t::aggregate_t(double, int)' into 'MatrixProfileKernelTLF' (/home/jscheerer/matrix-profile-hls/kernel/MatrixProfileKernelStreamless.cpp:14:0)
+INFO: [HLS 200-111] Finished Compiling Optimization and Transform: CPU user time: 2.88 seconds. CPU system time: 0.35 seconds. Elapsed time: 3.42 seconds; current allocated memory: 192.204 MB.
+INFO: [HLS 200-111] Finished Checking Pragmas: CPU user time: 0 seconds. CPU system time: 0 seconds. Elapsed time: 0 seconds; current allocated memory: 192.205 MB.
+INFO: [HLS 200-1493] Running only source code synthesis checks, skipping scheduling and RTL generation.
+INFO: [HLS 200-111] Finished Command csynth_design CPU user time: 13.66 seconds. CPU system time: 1.01 seconds. Elapsed time: 14.78 seconds; current allocated memory: 192.179 MB.
+HLS completed successfully
+INFO: [HLS 200-112] Total CPU user time: 15.68 seconds. Total CPU system time: 1.44 seconds. Total elapsed time: 16.38 seconds; peak allocated memory: 192.205 MB.
+INFO: [Common 17-206] Exiting vitis_hls at Mon Jul 19 17:49:15 2021...

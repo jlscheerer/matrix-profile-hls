@@ -1,0 +1,45 @@
+{
+ "session": {
+  "name": "MatrixProfileKernelTLF",
+  "uuid": "9931942b-e279-49ba-a8ca-06bfb684f4b1",
+  "description": "v++  --target sw_emu --compile -I/home/jscheerer/matrix-profile-hls/build_sw -I/home/jscheerer/matrix-profile-hls/kernel --config /home/jscheerer/matrix-profile-hls/build_sw/config/common-config.cfg --config /home/jscheerer/matrix-profile-hls/build_sw/config/compile-config.cfg -I/home/jscheerer/matrix-profile-hls/include -O3 -o/home/jscheerer/matrix-profile-hls/build_sw/MatrixProfileKernelTLF.xo /home/jscheerer/matrix-profile-hls/kernel/MatrixProfileKernelStreamless.cpp ",
+  "timestamp": "0",
+  "report_file": {
+   "scheme": "FILE",
+   "host": "",
+   "port": 0,
+   "path": "/home/jscheerer/matrix-profile-hls/build_sw/MatrixProfileKernel.build/reports/MatrixProfileKernelTLF/MatrixProfileKernelTLF_guidance.html",
+   "query": "",
+   "fragment": "",
+   "media_type": "",
+   "encoding": "",
+   "data": ""
+  },
+  "proto_file": {
+   "scheme": "FILE",
+   "host": "",
+   "port": 0,
+   "path": "/home/jscheerer/matrix-profile-hls/build_sw/MatrixProfileKernel.build/MatrixProfileKernelTLF_guidance.pb",
+   "query": "",
+   "fragment": "",
+   "media_type": "",
+   "encoding": "",
+   "data": ""
+  },
+  "build_target": "",
+  "config_files": [
+   {
+    "fileName": "/home/jscheerer/matrix-profile-hls/build_sw/config/common-config.cfg",
+    "contents": "platform=xilinx_u250_gen3x16_xdma_3_1_202020_1\nsave-temps=1\n"
+   },
+   {
+    "fileName": "/home/jscheerer/matrix-profile-hls/build_sw/config/compile-config.cfg",
+    "contents": "kernel=MatrixProfileKernelTLF\ndebug=1\nmessageDb=MatrixProfileKernel.build/MatrixProfileKernelTLF.mdb\ntemp_dir=MatrixProfileKernel.build\nreport_dir=MatrixProfileKernel.build/reports\nlog_dir=MatrixProfileKernel.build/logs\n\n[advanced]\nmisc=solution_name=MatrixProfileKernelTLF\n"
+   }
+  ]
+ },
+ "violation_count": 0,
+ "waived_count": 0,
+ "affirmation_count": 0
+}
+

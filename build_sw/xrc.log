@@ -1,0 +1,10 @@
+Mon Jul 19 17:49:28 2021: Server was asked to start on port: '40901'
+Mon Jul 19 17:49:28 2021: Server is using token UUID: 'b02a010a-cc8a-4755-bd68-720a0b36b49d'
+Mon Jul 19 17:49:28 2021: Attempting to start server on port '40901'
+Mon Jul 19 17:49:28 2021: XRC main fifo: created main fifo '/tmp/xrcmainb02a010a-cc8a-4755-bd68-720a0b36b49d', fd read = 13
+Mon Jul 19 17:49:28 2021: Running Rule Check Server
+Mon Jul 19 17:49:28 2021: Version 1.6.1
+Mon Jul 19 17:49:28 2021: Rule Check Server: Accepted socket connection from client
+Mon Jul 19 17:49:28 2021: EXCHANGE_TOKEN received, server token: b02a010a-cc8a-4755-bd68-720a0b36b49d, passed token: b02a010a-cc8a-4755-bd68-720a0b36b49d
+Mon Jul 19 17:49:28 2021: SESSION_MGR: creating session with session uuid: '3ac75bbb-68c6-40b9-a86e-498c24d7893e' and name 'link'
+Mon Jul 19 17:49:38 2021: SESSION_MGR: closing session for UUID '3ac75bbb-68c6-40b9-a86e-498c24d7893e' with name 'link'

@@ -1,0 +1,3 @@
+/home/jscheerer/matrix-profile-hls/build_sw/CMakeFiles/link.dir
+/home/jscheerer/matrix-profile-hls/build_sw/CMakeFiles/compile.dir
+/home/jscheerer/matrix-profile-hls/build_sw/CMakeFiles/host.dir

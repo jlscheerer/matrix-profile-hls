@@ -1,0 +1,12 @@
+[Configuration]
+MP_PLATFORM=xilinx_u250_gen3x16_xdma_3_1_202020_1
+MP_EMBEDDED=OFF
+MP_TARGET=sw_emu
+MP_QUICK_BUILD=OFF
+
+MP_KERNEL=Streamless
+MP_SIZE_N=8
+MP_SIZE_M=4
+
+MP_DATA_TYPE=double
+MP_INDEX_TYPE=int

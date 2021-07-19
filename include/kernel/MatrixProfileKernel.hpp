@@ -10,6 +10,7 @@
 
 struct aggregate_t { 
     data_t value; index_t index; 
+    aggregate_t() = default;
     aggregate_t(const data_t value, const index_t index)
         : value(value), index(index) {}
     
