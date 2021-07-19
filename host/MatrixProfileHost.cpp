@@ -39,13 +39,15 @@ using OpenCL::MemoryBank;
  */
 int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, const optional<std::string> &output){
     // Allocate Host-Side Memory
-    std::array<data_t, n> host_T;
-    
+    std::array<double, n> host_T;
     std::array<data_t, n - m + 1> host_QT;
     std::array<ComputePack, n - m + 1> host_data;
     
     std::array<data_t, n - m + 1> host_MP;
     std::array<index_t, n - m + 1> host_MPI;
+
+    // Matrix Profile (Euclidean Distance)
+    std::array<double, n - m + 1> host_MPE;
 
     // Load Input File Containing Time Series Data into Host Memory
     Log<LogLevel::Verbose>("Loading input time series...");
@@ -98,12 +100,12 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     buffer_MPI.CopyToHost(host_MPI.data());
 
     Log<LogLevel::Info>("Converting Pearson Correlation to Euclidean Distance");
-    HostSideComputation::PearsonCorrelationToEuclideanDistance(host_MP);
+    HostSideComputation::PearsonCorrelationToEuclideanDistance(host_MP, host_MPE);
 
     if(output){
         Log<LogLevel::Verbose>("Saving results (MP/MPI) to file...");
         // Write the Matrix Profile to disk
-        if(!FileIO::WriteBinaryFile((*output) + ".mpb", host_MP))
+        if(!FileIO::WriteBinaryFile((*output) + ".mpb", host_MPE))
             return EXIT_FAILURE;
 
         // Write the Matrix Profile Index to disk
@@ -112,12 +114,12 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     }else{
         // Just output the result to the console (for debugging)
         std::cout << "MP:";
-        for(size_t i = 0; i < sublen; ++i)
-    	    std::cout << " " << host_MP[i];
+        for(size_t i = 0; i < n - m + 1; ++i)
+    	    std::cout << " " << host_MPE[i];
         std::cout << std::endl;
 
         std::cout << "MPI:";
-        for(size_t i = 0; i < sublen; ++i)
+        for(size_t i = 0; i < n - m + 1; ++i)
             std::cout << " " << host_MPI[i];
         std::cout << std::endl;
     }

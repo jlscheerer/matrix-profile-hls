@@ -8,10 +8,10 @@
 
 namespace HostSideComputation {
 
-    void PrecomputeStatistics(std::array<data_t, n> &T, std::array<data_t, n - m + 1> &QT, std::array<ComputePack, n - m + 1> &data) {
+    void PrecomputeStatistics(std::array<double, n> &T, std::array<data_t, n - m + 1> &QT, std::array<ComputePack, n - m + 1> &data) {
         // Calculate the initial mean, then update using moving mean.
-        data_t mean = std::accumulate(T.begin(), T.begin() + m, static_cast<data_t>(0)); mean /= m;
-        data_t prev_mu, mu0 = mean;
+        double mean = std::accumulate(T.begin(), T.begin() + m, static_cast<data_t>(0)); mean /= m;
+        double prev_mu, mu0 = mean;
 
         // Compute Statistics in single pass through the data
         for (index_t i = 0; i < n - m + 1; ++i) {
@@ -22,18 +22,19 @@ namespace HostSideComputation {
                             : static_cast<data_t>(0);
             data[i].dg = (i > 0) ? ((T[i + m - 1] - mean) + (T[i - 1] - prev_mu)) 
                             : static_cast<data_t>(0);
-            QT[i] = 0; data[i].inv = 0;
+            double qt = 0, inv = 0;
             for (index_t k = 0; k < m; ++k) {
-                QT[i]  += (T[i + k] - mean) * (T[k] - mu0);
-                data[i].inv += (T[i + k] - mean) * (T[i + k] - mean);
+                qt  += (T[i + k] - mean) * (T[k] - mu0);
+                inv += (T[i + k] - mean) * (T[i + k] - mean);
             }
-            data[i].inv = static_cast<data_t>(1) / std::sqrt(data[i].inv);
+            QT[i] = qt;
+            data[i].inv = (1 / std::sqrt(inv));
         }
     }
 
-    void PearsonCorrelationToEuclideanDistance(std::array<data_t, n - m + 1> &MP) {
+    void PearsonCorrelationToEuclideanDistance(std::array<data_t, n - m + 1> &PearsonCorrelation, std::array<double, n - m + 1> &EuclideanDistance) {
         for (index_t i = 0; i < n - m + 1; ++i)
-            MP[i] = std::sqrt(2 * m * (1 - MP[i]));
+            EuclideanDistance[i] = std::sqrt(2 * m * (1 - PearsonCorrelation[i]));
     }
 
 }
