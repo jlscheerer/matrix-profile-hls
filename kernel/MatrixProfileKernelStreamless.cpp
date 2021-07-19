@@ -19,11 +19,12 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
 
     data_t QT[n - m + 1], P[n - m + 1];
     aggregate_t rowAggregate[n - m + 1], columnAggregate[n - m + 1];
+    ComputePack rowData[n - m + 1], columnData[n - m + 1];
 
     for (index_t i = 0; i < n - m + 1; ++i) {
         QT[i] = QTInit[i];
-        rowAggregate[i] = aggregate_t_init;
-        columnAggregate[i] = aggregate_t_init;
+        rowData[i] = data[i]; columnData[i] = data[i];
+        rowAggregate[i] = aggregate_t_init; columnAggregate[i] = aggregate_t_init;
     }
 
     // =============== [/Compute] ===============
@@ -37,24 +38,30 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
         //               <==> k <= m/4
         MatrixProfileComputeColumn:
         for (index_t i = (m / 4); i < n - m + 1; ++i) {
-            const index_t column = k + i;
+            #pragma HLS PIPELINE II=1
+            const index_t columnIndex = k + i;
             const bool computationInRange = k + i < n - m + 1;
-            const ComputePack rowData = data[k];
-            const ComputePack columnData = computationInRange ? data[column] : (ComputePack){0, 0, 0};
 
+            const ComputePack row = rowData[k];
+            const ComputePack column = computationInRange
+                                        ? columnData[columnIndex] 
+                                        : (ComputePack){0, 0, 0};
+            
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
             // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
-            QT[i] += rowData.df * columnData.dg + columnData.df * rowData.dg;
-            
+            QT[i] += row.df * column.dg + column.df * row.dg;
+
             // calculate pearson correlation
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
-            P[i] = QT[i] * rowData.inv * columnData.inv;
+            P[i] = QT[i] * row.inv * column.inv;
 
             // Update Aggregates
-            if(computationInRange && P[i] > columnAggregate[column].value)
-                columnAggregate[column] = {P[i], static_cast<index_t>(k)};
-            if(computationInRange && P[i] > rowAggregate[k].value)
-                rowAggregate[k] = {P[i], static_cast<index_t>(column)};
+            columnAggregate[columnIndex] = (computationInRange && columnAggregate[columnIndex].value < P[i])
+                                            ? aggregate_t{P[i], static_cast<index_t>(k)}
+                                            :columnAggregate[columnIndex];
+            rowAggregate[k] = (computationInRange && rowAggregate[k].value < P[i])
+                                ? aggregate_t{P[i], static_cast<index_t>(columnIndex)}
+                                : rowAggregate[k];
         }
     }
     // =============== [/Compute] ===============
@@ -64,9 +71,8 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
     ReductionCompute:
     for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
-        aggregate_t rowAggregate_m = rowAggregate[i], columnAggregate_m = columnAggregate[i];
-        MP[i]  = rowAggregate_m.value > columnAggregate_m.value ? rowAggregate_m.value : columnAggregate_m.value;
-        MPI[i] = rowAggregate_m.value > columnAggregate_m.value ? rowAggregate_m.index : columnAggregate_m.index;
+        const aggregate_t aggregate = rowAggregate[i] > columnAggregate[i] ? rowAggregate[i] : columnAggregate[i];
+        MP[i]  = aggregate.value; MPI[i] = aggregate.index;
     }
     // =============== [/Reduce] ===============
 }

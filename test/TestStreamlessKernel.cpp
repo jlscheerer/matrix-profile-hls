@@ -20,10 +20,15 @@ namespace MatrixProfileTests {
         // used to indicate an invalid/undetermined index
         static constexpr index_t index_init = IndexInit<index_t>();
 
-        struct aggregate_t {
-            data_t value;
-            index_t index;
+        struct aggregate_t { 
+            data_t value; index_t index; 
+            aggregate_t() = default;
+            aggregate_t(const data_t value, const index_t index)
+                : value(value), index(index) {}
+            bool operator<(const data_t other) const { return value > other; }
+            bool operator>(const aggregate_t other) const { return value > other.value; }
         };
+
         using ComputePack = typename MatrixProfileKernel<data_t, index_t, n, m>::ComputePack;
         #include "MatrixProfileKernelStreamless.cpp"
     };
