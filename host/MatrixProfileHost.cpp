@@ -16,6 +16,8 @@
 #include "Config.hpp"
 
 #include "host/MatrixProfileHost.hpp"
+#include "host/HostSideComputation.hpp"
+
 #include "host/OpenCL.hpp"
 #include "host/FileIO.hpp"
 #include "host/Timer.hpp"
@@ -38,14 +40,20 @@ using OpenCL::MemoryBank;
 int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, const optional<std::string> &output){
     // Allocate Host-Side Memory
     std::array<data_t, n> host_T;
-    std::array<data_t, sublen> host_MP;
-    std::array<index_t, sublen> host_MPI;
+    
+    std::array<data_t, n - m + 1> host_QT;
+    std::array<ComputePack, n - m + 1> host_data;
+    
+    std::array<data_t, n - m + 1> host_MP;
+    std::array<index_t, n - m + 1> host_MPI;
 
-    // cwd: /media/sd-mmcblk0p1
     // Load Input File Containing Time Series Data into Host Memory
     Log<LogLevel::Verbose>("Loading input time series...");
     if(!FileIO::ReadBinaryFile(input, host_T))
         return EXIT_FAILURE;
+
+    Log<LogLevel::Info>("Precomputing Statistics on Host");
+    HostSideComputation::PrecomputeStatistics(host_T, host_QT, host_data);
 
     Log<LogLevel::Verbose>("Initializing OpenCL context...");
     OpenCL::Context context;
@@ -53,25 +61,29 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     // These commands will allocate memory on the Device. OpenCL::Buffer 
     // objects can be used to reference the memory locations on the device.
     Log<LogLevel::Verbose>("Initializing Memory...");
-    OpenCL::Buffer<data_t, Access::ReadOnly> buffer_T{
-        context.MakeBuffer<data_t, Access::ReadOnly>(MemoryBank::MemoryBank0, n)
+    OpenCL::Buffer<data_t, Access::ReadOnly> buffer_QT{
+        context.MakeBuffer<data_t, Access::ReadOnly>(MemoryBank::MemoryBank0, n - m + 1)
+    };
+    OpenCL::Buffer<data_t, Access::ReadOnly> buffer_data{
+        context.MakeBuffer<data_t, Access::ReadOnly>(MemoryBank::MemoryBank1, n - m + 1)
     };
     OpenCL::Buffer<data_t, Access::WriteOnly> buffer_MP{
-        context.MakeBuffer<data_t, Access::WriteOnly>(MemoryBank::MemoryBank0, sublen)
+        context.MakeBuffer<data_t, Access::WriteOnly>(MemoryBank::MemoryBank0, n - m + 1)
     };
     OpenCL::Buffer<index_t, Access::WriteOnly> buffer_MPI{
-        context.MakeBuffer<index_t, Access::WriteOnly>(MemoryBank::MemoryBank1, sublen)
+        context.MakeBuffer<index_t, Access::WriteOnly>(MemoryBank::MemoryBank1, n - m + 1)
     };
 
     Log<LogLevel::Verbose>("Programming device...");
     OpenCL::Program program{context.MakeProgram(xclbin)};
 
     Log<LogLevel::Verbose>("Copying memory to device...");
-    buffer_T.CopyFromHost(host_T.cbegin(), host_T.cend());
+    buffer_QT.CopyFromHost(host_QT.cbegin(), host_QT.cend());
+    buffer_data.CopyFromHost(host_data.cbegin(), host_data.cend());
 
     Log<LogLevel::Verbose>("Creating Kernel...");
     OpenCL::Kernel kernel{
-        program.MakeKernel(KernelTLF, buffer_T, buffer_MP, buffer_MPI)
+        program.MakeKernel(KernelTLF, buffer_QT, buffer_data, buffer_MP, buffer_MPI)
     };
 
     Log<LogLevel::Verbose>("Executing Kernel...");
@@ -84,6 +96,9 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     Log<LogLevel::Verbose>("Copying back result...");
     buffer_MP.CopyToHost(host_MP.data());
     buffer_MPI.CopyToHost(host_MPI.data());
+
+    Log<LogLevel::Info>("Converting Pearson Correlation to Euclidean Distance");
+    HostSideComputation::PearsonCorrelationToEuclideanDistance(MP);
 
     if(output){
         Log<LogLevel::Verbose>("Saving results (MP/MPI) to file...");

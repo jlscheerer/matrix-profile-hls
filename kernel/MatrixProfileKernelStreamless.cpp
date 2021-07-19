@@ -13,7 +13,7 @@
 
 void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_t *MP, index_t *MPI) {
     #pragma HLS INTERFACE m_axi port=QTInit offset=slave bundle=gmem0
-    #pragma HLS INTERFACE m_axi port=data   offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=data   offset=slave bundle=gmem2
     #pragma HLS INTERFACE m_axi port=MP     offset=slave bundle=gmem1
     #pragma HLS INTERFACE m_axi port=MPI    offset=slave bundle=gmem2
 

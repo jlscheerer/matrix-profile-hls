@@ -4,12 +4,11 @@
 
 #include <array>
 #include <numeric>
+#include <cmath>
 
-namespace MatrixProfileUtil {
+namespace HostSideComputation {
 
-    void PrecomputeStatistics(std::array<data_t, n> &T, std::array<data_t, n - m + 1> &QT, 
-                              std::array<data_t, n - m + 1> &df, std::array<data_t, n - m + 1> &dg, 
-                              std::array<data_t, n - m + 1> &inv) {
+    void PrecomputeStatistics(std::array<data_t, n> &T, std::array<data_t, n - m + 1> &QT, std::array<ComputePack, n - m + 1> &data) {
         // Calculate the initial mean, then update using moving mean.
         data_t mean = std::accumulate(T.begin(), T.begin() + m, static_cast<data_t>(0)); mean /= m;
         data_t prev_mu, mu0 = mean;
@@ -19,17 +18,22 @@ namespace MatrixProfileUtil {
             prev_mu = mean;
             mean += (i > 0) ? ((T[i + m - 1] - T[i - 1]) / m) 
                             : 0;
-            df[i] = (i > 0) ? (T[i + m - 1] - T[i - 1]) / 2 
+            data[i].df = (i > 0) ? (T[i + m - 1] - T[i - 1]) / 2 
                             : static_cast<data_t>(0);
-            dg[i] = (i > 0) ? ((T[i + m - 1] - mean) + (T[i - 1] - prev_mu)) 
+            data[i].dg = (i > 0) ? ((T[i + m - 1] - mean) + (T[i - 1] - prev_mu)) 
                             : static_cast<data_t>(0);
-            QT[i] = 0; inv[i] = 0;
+            QT[i] = 0; data[i].inv = 0;
             for (index_t k = 0; k < m; ++k) {
                 QT[i]  += (T[i + k] - mean) * (T[k] - mu0);
-                inv[i] += (T[i + k] - mean) * (T[i + k] - mean);
+                data[i].inv += (T[i + k] - mean) * (T[i + k] - mean);
             }
-            inv[i] = static_cast<data_t>(1) / inv[i];
+            data[i].inv = static_cast<data_t>(1) / std::sqrt(data[i].inv);
         }
+    }
+
+    void PearsonCorrelationToEuclideanDistance(std::array<data_t, n - m + 1> &MP) {
+        for (index_t i = 0; i < n - m + 1; ++i)
+            MP[i] = std::sqrt(2 * m * (1 - MP[i]));
     }
 
 }

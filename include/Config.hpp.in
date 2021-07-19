@@ -35,6 +35,8 @@ static const index_t index_init = IndexInit<index_t>::value;
 
 static constexpr bool target_embedded = ${MP_EMBEDDED_BOOL};
 
+struct ComputePack { data_t df, dg, inv; };
+
 // "translate" the selected kernel implementation (type) to a readable string
 #define KERNEL_IMPL_NAME "v${MP_KERNEL}"
 #define KERNEL_IMPL_INDEX ${kernel_index}
