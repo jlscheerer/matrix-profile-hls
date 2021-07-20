@@ -16,7 +16,7 @@ struct aggregate_t {
     
     bool operator<(const data_t other) const { 
         #pragma HLS INLINE
-        return value > other;
+        return value < other;
     }
     bool operator>(const aggregate_t other) const {
         #pragma HLS INLINE

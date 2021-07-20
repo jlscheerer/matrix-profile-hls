@@ -25,7 +25,7 @@ namespace MatrixProfileTests {
             aggregate_t() = default;
             aggregate_t(const data_t value, const index_t index)
                 : value(value), index(index) {}
-            bool operator<(const data_t other) const { return value > other; }
+            bool operator<(const data_t other) const { return value < other; }
             bool operator>(const aggregate_t other) const { return value > other.value; }
         };
 
