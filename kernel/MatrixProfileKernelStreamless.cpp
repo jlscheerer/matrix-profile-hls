@@ -34,6 +34,9 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
 
     data_t rowReduce[16];
     #pragma HLS ARRAY_PARTITION variable=rowReduce complete
+    
+    constexpr int T = 4;
+    data_t columnReduce[n - m + 1][T];
     // =============== [/Compute] ===============
     // Do the actual calculations via updates
     MatrixProfileComputeRow:
@@ -56,16 +59,13 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
             P[i] = QT[i] * row.inv * column.inv;
 
-            data_t prev = (i == 0) ? aggregate_init : rowReduce[i % 16];
-            rowReduce[i % 16] = prev > P[i] ? prev : P[i];
-            // if (computationInRange)
-            // columnAggregate[columnIndex + (k % 2 ? 0 : n - m + 1)] = nextColumn > prevColumn 
-            //							? nextColumn : prevColumn;
-            //const aggregate_t cValue{P, k}, rValue{P, columnIndex};
-            
-            //columnAggregate[columnIndex] = columnAggregate[columnIndex] > cValue 
-            //					? columnAggregate[columnIndex] : cValue;
-                //rowAggregate[k] = rowAggregate[k] > rValue ? rowAggregate[k] :  rValue;
+            // Row-Wise Partial Reduction
+            data_t prevRow = (i == 0) ? aggregate_init : rowReduce[i % 16];
+            rowReduce[i % 16] = prevRow > P[i] ? prevRow : P[i];
+
+            // Column-Wise Partial Reduction
+            data_t prevColumn = (k < T/2) ? aggregate_init : columnReduce[columnIndex][k % T];
+	        columnReduce[columnIndex][(k + T/2) % T] = prevColumn > P[i] ? prevColumn : P[i];
 	    }
 
         MP[k] = TreeReduce::Maximum<data_t, 16>(rowReduce);
@@ -77,9 +77,10 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
     ReductionCompute:
     for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
-        const aggregate_t aggregate = rowAggregate[i] > columnAggregate[i] 
-					? rowAggregate[i] : columnAggregate[i];
-        MP[i]  = QT[i]; MPI[i] = aggregate.index;
+        //const aggregate_t aggregate = rowAggregate[i] > columnAggregate[i] 
+		//			? rowAggregate[i] : columnAggregate[i];
+        MP[i] = columnReduce[i][0];
+        //MP[i] = QT[i]; MPI[i] = aggregate.index;
     }
     // =============== [/Reduce] ===============
 }
