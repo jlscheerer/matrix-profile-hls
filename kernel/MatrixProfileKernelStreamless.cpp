@@ -20,27 +20,16 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
     #pragma HLS INTERFACE m_axi port=MPI    offset=slave bundle=gmem2
 
     data_t QT[n - m + 1], P[n - m + 1];
-    MatrixProfileInitQT:
+    ComputePack columnData[n - m + 1]; aggregate_t columnAggregate[n - m + 1];
+    ComputePack rowData[n - m + 1]; aggregate_t rowAggregate[n - m + 1];
+
+    // TODO: Could move to implicit instantialization of row- and columnAggregate during the computation
+    MatrixProfileInit:
     for (index_t i = 0; i < n - m + 1; ++i) {
        	#pragma HLS PIPELINE II=1
         QT[i] = QTInit[i];
-    }
-
-    // TODO: Could move to implicit instantialization of row- and columnAggregate during the computation
-    ComputePack rowData[n - m + 1]; aggregate_t rowAggregate[n - m + 1];
-    MatrixProfileInitRow:
-    for (index_t i = 0; i < n - m + 1; ++i) {
-        #pragma HLS PIPELINE II=1
-        rowData[i] = data[i];
-        rowAggregate[i] = aggregate_t_init;
-    }
-    
-    ComputePack columnData[n - m + 1]; aggregate_t columnAggregate[n - m + 1];
-    MatrixProfileInitColumn:
-    for (index_t i = 0; i < n - m + 1; ++i) {
-        #pragma HLS PIPELINE II=1
-        columnData[i] = data[i];
-        columnAggregate[i] = aggregate_t_init;
+        rowData[i] = data[i]; rowAggregate[i] = aggregate_t_init;
+        columnData[i] = data[i]; columnAggregate[i] = aggregate_t_init;
     }
 
     data_t rowReduce[16];
