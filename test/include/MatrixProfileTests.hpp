@@ -20,6 +20,8 @@
 #include "MockStream.hpp"
 using Mock::stream;
 
+#include "kernel/TreeReduce.hpp"
+
 #include "MatrixProfileReference.hpp"
 
 #define aggregate_t_init (aggregate_t){aggregate_init, index_init}
