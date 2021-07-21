@@ -99,11 +99,6 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     buffer_MP.CopyToHost(host_MP.data());
     buffer_MPI.CopyToHost(host_MPI.data());
 
-    Log<LogLevel::Info>("Received Pearson Correlations:");
-    for (int i = 0; i < n - m + 1; ++i)
-        std::cout << host_MP[i] << " ";
-    std::cout << std::endl;
-
     Log<LogLevel::Info>("Converting Pearson Correlation to Euclidean Distance");
     HostSideComputation::PearsonCorrelationToEuclideanDistance(host_MP, host_MPE);
 
