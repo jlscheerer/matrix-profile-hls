@@ -78,7 +78,7 @@ void ProcessingElement(const int stage, stream<ScatterPack, stream_d> &scatter_i
 
         for (index_t j = 0; j < t; ++j) {
             QT[j] += row.df * column[j].dg + column[j].df * row.dg;
-            const bool inBounds = i < stage * t + j - (m / 4);
+            const bool inBounds = i <= stage * t + j - (m / 4);
 
             P[j] = inBounds ? QT[j] * row.inv * column[j].inv : 0;
             
