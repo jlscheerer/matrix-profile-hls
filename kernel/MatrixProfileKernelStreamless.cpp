@@ -23,7 +23,6 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
     ComputePack columnData[n - m + 1]; aggregate_t columnAggregate[n - m + 1];
     ComputePack rowData[n - m + 1]; aggregate_t rowAggregate[n - m + 1];
 
-    // TODO: Could move to implicit instantialization of row- and columnAggregate during the computation
     MatrixProfileInit:
     for (index_t i = 0; i < n - m + 1; ++i) {
        	#pragma HLS PIPELINE
@@ -32,27 +31,19 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
         columnData[i] = data[i];
     }
 
-    // Needs to be explicitly initialized if n - m + 1 < 16
-    // Because for every row we perform a reduction on all elements!
-    // For every n - m + 1 >= 16 we handle this via implicit initializaiton
     aggregate_t rowReduce[16];
     #pragma HLS ARRAY_PARTITION variable=rowReduce complete
 
-    for (int i = 0; i < n - m + 1; ++i) {
-	#pragma HLS UNROLL
-	rowReduce[i] = aggregate_t_init;
+    // rowReduce needs to be explicitly initialized if n - m + 1 < 16
+    // Because for every row we perform a reduction on all elements!
+    // For every n - m + 1 >= 16 we handle this via implicit initializaiton
+    for (index_t i = 0; i < 16; ++i) {
+	    #pragma HLS UNROLL
+	    rowReduce[i] = aggregate_t_init;
     }
 
     constexpr int T = 4;
     aggregate_t columnReduce[n - m + 1][T];
-
-    MatrixProfileInitColumn:
-    for (index_t i = 0; i < n - m + 1; ++i) {
-	#pragma HLS PIPELINE
-        for (index_t k = 0; k < 4; ++k) {
-            columnReduce[i][k] = aggregate_t_init;
-        }
-    }
 
     // =============== [/Compute] ===============
     // Do the actual calculations via updates
@@ -69,35 +60,34 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
             const ComputePack column = (!exclusionZone && computationInRange)
                                             ? columnData[columnIndex] : (ComputePack){0, 0, 0};
 
-	    QT[i] += row.df * column.dg + column.df * row.dg;
+	        QT[i] += row.df * column.dg + column.df * row.dg;
 
             // calculate pearson correlation
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
             const data_t P = QT[i] * row.inv * column.inv;
 
             // Row-Wise Partial Reduction
-            // aggregate_t prevRow = (i < 16) ? aggregate_t_init : rowReduce[i % 16];
-	    aggregate_t prevRow = (i < 16) ? aggregate_t_init : rowReduce[i % 16];
+            aggregate_t prevRow = (i < 16) ? aggregate_t_init : rowReduce[i % 16];
             rowReduce[i % 16] = P > prevRow.value ? aggregate_t(P, columnIndex) : prevRow;
 
             // Column-Wise Partial Reduction
-            // aggregate_t prevColumn = (k < T/2) ? aggregate_t_init : columnReduce[columnIndex][k % T];
             // Wrap-Around works because if we are not outside the exlusionZone value will be 0
-	    aggregate_t prevColumn = columnReduce[columnIndex % (n - m + 1)][k % T];
-	    columnReduce[columnIndex % (n - m + 1)][(k + T/2) % T] = prevColumn.value > P ? prevColumn : aggregate_t(P, k);
-	}
+            aggregate_t prevColumn = (k < T/2) ? aggregate_t_init : columnReduce[columnIndex % (n - m + 1)][k % T];
+	        columnReduce[columnIndex % (n - m + 1)][(k + T/2) % T] = prevColumn.value > P ? prevColumn : aggregate_t(P, k);
+        }
 
         rowAggregate[k] = TreeReduce::Maximum<aggregate_t, 16>(rowReduce);
     }
     // =============== [/Compute] ===============
+    
+    // =============== [Reduce] ===============
     ReduceColumns:
     for (int i = 0; i < n - m + 1; ++i) {
-	// needs to read for elements per iteration to reduce
-	#pragma HLS PIPELINE II=4
+	    // needs to read four elements per iteration to reduce
+	    #pragma HLS PIPELINE II=4
     	columnAggregate[i] = TreeReduce::Maximum<aggregate_t, T>(columnReduce[i]);
     }
 
-    // =============== [Reduce] ===============
     // compute maximum between row- and column-wise aggregates
     ReductionCompute:
     for (index_t i = 0; i < n - m + 1; ++i) {
