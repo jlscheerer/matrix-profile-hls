@@ -32,8 +32,16 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
         columnData[i] = data[i];
     }
 
+    // Needs to be explicitly initialized if n - m + 1 < 16
+    // Because for every row we perform a reduction on all elements!
+    // For every n - m + 1 >= 16 we handle this via implicit initializaiton
     aggregate_t rowReduce[16];
     #pragma HLS ARRAY_PARTITION variable=rowReduce complete
+
+    for (int i = 0; i < n - m + 1; ++i) {
+	#pragma HLS UNROLL
+	rowReduce[i] = aggregate_t_init;
+    }
 
     constexpr int T = 4;
     aggregate_t columnReduce[n - m + 1][T];
@@ -50,12 +58,6 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
     // Do the actual calculations via updates
     MatrixProfileComputeRow:
     for (index_t k = 0; k < n - m + 1; ++k) {
-        // Have to set rowAggregates back to 0! (if n - m + 1 < 16!)
-        for (int j = 0; j < 16; ++j) {
-            #pragma HLS UNROLL
-            rowReduce[j] = aggregate_t_init;
-        }
-
         MatrixProfileComputeColumn:
         for (index_t i = 0; i < n - m + 1; ++i) {
             #pragma HLS PIPELINE II=1
@@ -75,10 +77,8 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
 
             // Row-Wise Partial Reduction
             // aggregate_t prevRow = (i < 16) ? aggregate_t_init : rowReduce[i % 16];
-
-	    aggregate_t prevRow = rowReduce[i % 16];
+	    aggregate_t prevRow = (i < 16) ? aggregate_t_init : rowReduce[i % 16];
             rowReduce[i % 16] = P > prevRow.value ? aggregate_t(P, columnIndex) : prevRow;
-	    // rowAggregate[k] = P > rowAggregate[k].value ? aggregate_t(P, columnIndex) : rowAggregate[k];
 
             // Column-Wise Partial Reduction
             // aggregate_t prevColumn = (k < T/2) ? aggregate_t_init : columnReduce[columnIndex][k % T];
@@ -92,16 +92,17 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
     // =============== [/Compute] ===============
     ReduceColumns:
     for (int i = 0; i < n - m + 1; ++i) {
-	#pragma HLS PIPELINE
+	// needs to read for elements per iteration to reduce
+	#pragma HLS PIPELINE II=4
     	columnAggregate[i] = TreeReduce::Maximum<aggregate_t, T>(columnReduce[i]);
     }
 
     // =============== [Reduce] ===============
-    // Just always take the max
+    // compute maximum between row- and column-wise aggregates
     ReductionCompute:
     for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
-        const aggregate_t aggregate = rowAggregate[i].value > columnAggregate[i].value 
+        const aggregate_t aggregate = rowAggregate[i].value > columnAggregate[i].value
 					? rowAggregate[i] : columnAggregate[i];
         MP[i] = aggregate.value;
         MPI[i] = aggregate.index;
