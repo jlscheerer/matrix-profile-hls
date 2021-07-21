@@ -25,7 +25,7 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
 
     MatrixProfileInit:
     for (index_t i = 0; i < n - m + 1; ++i) {
-       	#pragma HLS PIPELINE
+       	#pragma HLS PIPELINE II=2
         QT[i] = QTInit[i];
         rowData[i] = data[i];
         columnData[i] = data[i];

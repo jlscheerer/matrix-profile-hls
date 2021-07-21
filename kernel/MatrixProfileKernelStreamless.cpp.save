@@ -1,0 +1,93 @@
+/**
+ * @file    MatrixProfileKernelStreamless.cpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   Implementation of the Kernel (C++/Vitis HLS) [Streamless]
+ */
+
+#if !defined(TEST_MOCK_SW)
+    #include "Config.hpp"
+    #include "kernel/MatrixProfileKernel.hpp"
+
+    #include "hls_math.h"
+#endif
+
+template<typename T>
+T max(const T &&a, const T &&b) {
+    #pragma HLS INLINE
+    return a > b ? a : b;
+}
+
+void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_t *MP, index_t *MPI) {
+    #pragma HLS INTERFACE m_axi port=QTInit offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=data   offset=slave bundle=gmem2
+    #pragma HLS INTERFACE m_axi port=MP     offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=MPI    offset=slave bundle=gmem2
+
+    data_t QT[n - m + 1], QT2[n - m + 1];
+
+    ComputePack rowData[n - m + 1], columnData[n - m + 1];
+
+    MatrixProfileInitQT:
+    for (index_t i = 0; i < n - m + 1; ++i) {
+       	#pragma HLS PIPELINE
+	QT[i] = QTInit[i];
+	const ComputePack read = data[i];
+	rowData[i] = read;
+	columnData[i] = read;
+    }
+
+    aggregate_t rowAggregate[n - m + 1];
+    aggregate_t columnAggregate[n - m + 1];
+    aggregate_t columnAggregate2[n - m + 1];
+    // =============== [/Compute] ===============
+    // Do the actual calculations via updates
+    MatrixProfileComputeRow:
+    for (index_t k = 0; k < n - m + 1; ++k) {
+        // exclusionZone integrated into loop bounds
+        // exclusionZone <==> row - m/4 <= column <= row + m/4
+        //               <==> column <= row + m/4 [(row <= column, m > 0) ==> row - m/4 <= column]
+        //               <==> row + k <= row + m/4
+        //               <==> k <= m/4
+        MatrixProfileComputeColumn:
+        for (index_t i = (m / 4); i < n - m + 1; ++i) {
+            #pragma HLS PIPELINE II=1
+            const index_t columnIndex = k + i;
+            const bool computationInRange = k + i < n - m + 1;
+
+            const ComputePack row = rowData[k];
+            const ComputePack column = computationInRange 
+					? columnData[columnIndex] : (ComputePack){0, 0, 0};
+            
+	    QT[i] += row.df * column.dg + column.df * row.dg;
+
+	    // calculate pearson correlation
+            // P_{i, j} = QT_{i, j} * inv_i * inv_j
+            const data_t P = QT[i] * row.inv * column.inv;
+
+	    const aggregate_t prevColumn = (k == 0) ? aggregate_t_init 
+						: ((k % 2) ? columnAggregate[columnIndex] : columnAggregate2[columnIndex]);
+	    const aggregate_t nextColumn{P, k};
+		
+	    if (k % 2) columnAggregate2[columnIndex] = nextColumn > prevColumn ? nextColumn : prevColumn
+	    else columnAggregate[columnIndex] = nextColumn > prevColumn ? nextColumn : prevColumn;
+	    //const aggregate_t cValue{P, k}, rValue{P, columnIndex};
+	    
+
+	    //columnAggregate[columnIndex] = columnAggregate[columnIndex] > cValue 
+	    //					? columnAggregate[columnIndex] : cValue;
+            //rowAggregate[k] = rowAggregate[k] > rValue ? rowAggregate[k] :  rValue;
+	}
+    }
+    // =============== [/Compute] ===============
+    
+    // =============== [Reduce] ===============
+    // Just always take the max
+    ReductionCompute:
+    for (index_t i = 0; i < n - m + 1; ++i) {
+        #pragma HLS PIPELINE II=1
+        const aggregate_t aggregate = rowAggregate[i] > columnAggregate[i] 
+					? rowAggregate[i] : columnAggregate[i];
+        MP[i]  = QT[i]; MPI[i] = aggregate.index;
+    }
+    // =============== [/Reduce] ===============
+}
