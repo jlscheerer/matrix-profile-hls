@@ -57,9 +57,10 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
 	    rowReduce[i] = aggregate_t_init;
     }
 
-    constexpr int T = 4;
+    // TODO: Comment "Double-Buffer" Write to opposite position than is being read
+    // TODO: Clean-Up Access to columnReduce
+    constexpr int T = 2;
     aggregate_t columnReduce[n - m + 1][T];
-    #pragma HLS ARRAY_PARTITION variable=T dim=2 complete
 
     // =============== [/Compute] ===============
     MatrixProfileComputeRow:
