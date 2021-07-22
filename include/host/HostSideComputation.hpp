@@ -8,9 +8,9 @@
 
 namespace HostSideComputation {
 
-    void PrecomputeStatistics(std::array<double, n> &T, std::array<data_t, n - m + 1> &QT, std::array<ComputePack, n - m + 1> &data) {
+    void PrecomputeStatistics(std::array<double, n> &T, std::array<InputDataPack, n - m + 1> &data) {
         // Calculate the initial mean, then update using moving mean.
-        double mean = std::accumulate(T.begin(), T.begin() + m, (double)0); mean /= m;
+        double mean = std::accumulate(T.begin(), T.begin() + m, static_cast<double>(0)); mean /= m;
         double prev_mu, mu0 = mean;
 
         // Compute Statistics in single pass through the data
@@ -22,12 +22,12 @@ namespace HostSideComputation {
             data[i].dg = (i > 0) ? static_cast<data_t>(((T[i + m - 1] - mean) + (T[i - 1] - prev_mu))) 
                             : static_cast<data_t>(0);
 
-	    double qt = 0, inv = 0;
+	        double qt = 0, inv = 0;
             for (index_t k = 0; k < m; ++k) {
                 qt += (T[i + k] - mean) * (T[k] - mu0);
                 inv += (T[i + k] - mean) * (T[i + k] - mean);
             }
-            QT[i] = qt;
+            data[i].QT = qt;
             data[i].inv = (1 / std::sqrt(inv));
         }
     }

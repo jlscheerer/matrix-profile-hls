@@ -40,8 +40,7 @@ using OpenCL::MemoryBank;
 int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, const optional<std::string> &output){
     // Allocate Host-Side Memory
     std::array<double, n> host_T;
-    std::array<data_t, n - m + 1> host_QT;
-    std::array<ComputePack, n - m + 1> host_data;
+    std::array<InputDataPack, n - m + 1> host_data;
     
     std::array<data_t, n - m + 1> host_MP;
     std::array<index_t, n - m + 1> host_MPI;
@@ -55,7 +54,7 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
         return EXIT_FAILURE;
 
     Log<LogLevel::Info>("Precomputing Statistics on Host");
-    HostSideComputation::PrecomputeStatistics(host_T, host_QT, host_data);
+    HostSideComputation::PrecomputeStatistics(host_T, host_data);
 
     Log<LogLevel::Verbose>("Initializing OpenCL context...");
     OpenCL::Context context;
@@ -63,16 +62,13 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     // These commands will allocate memory on the Device. OpenCL::Buffer 
     // objects can be used to reference the memory locations on the device.
     Log<LogLevel::Verbose>("Initializing Memory...");
-    OpenCL::Buffer<data_t, Access::ReadOnly> buffer_QT{
-        context.MakeBuffer<data_t, Access::ReadOnly>(MemoryBank::MemoryBank0, n - m + 1)
+    OpenCL::Buffer<InputDataPack, Access::ReadOnly> buffer_data {
+        context.MakeBuffer<InputDataPack, Access::ReadOnly>(MemoryBank::MemoryBank0, n - m + 1)
     };
-    OpenCL::Buffer<ComputePack, Access::ReadOnly> buffer_data{
-        context.MakeBuffer<ComputePack, Access::ReadOnly>(MemoryBank::MemoryBank1, n - m + 1)
-    };
-    OpenCL::Buffer<data_t, Access::WriteOnly> buffer_MP{
+    OpenCL::Buffer<data_t, Access::WriteOnly> buffer_MP {
         context.MakeBuffer<data_t, Access::WriteOnly>(MemoryBank::MemoryBank0, n - m + 1)
     };
-    OpenCL::Buffer<index_t, Access::WriteOnly> buffer_MPI{
+    OpenCL::Buffer<index_t, Access::WriteOnly> buffer_MPI {
         context.MakeBuffer<index_t, Access::WriteOnly>(MemoryBank::MemoryBank1, n - m + 1)
     };
 
@@ -80,12 +76,11 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     OpenCL::Program program{context.MakeProgram(xclbin)};
 
     Log<LogLevel::Verbose>("Copying memory to device...");
-    buffer_QT.CopyFromHost(host_QT.cbegin(), host_QT.cend());
     buffer_data.CopyFromHost(host_data.cbegin(), host_data.cend());
 
     Log<LogLevel::Verbose>("Creating Kernel...");
     OpenCL::Kernel kernel{
-        program.MakeKernel(KernelTLF, buffer_QT, buffer_data, buffer_MP, buffer_MPI)
+        program.MakeKernel(KernelTLF, buffer_data, buffer_MP, buffer_MPI)
     };
 
     Log<LogLevel::Verbose>("Executing Kernel...");

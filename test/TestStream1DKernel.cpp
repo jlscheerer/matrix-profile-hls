@@ -29,7 +29,7 @@ namespace MatrixProfileTests {
             bool operator>(const aggregate_t other) const { return value > other.value; }
         };
 
-        using ComputePack = typename MatrixProfileKernel<data_t, index_t, n, m>::ComputePack;
+        using InputDataPack = typename MatrixProfileKernel<data_t, index_t, n, m>::InputDataPack;
         #include "MatrixProfileKernelStream1D.cpp"
     };
 

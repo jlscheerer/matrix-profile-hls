@@ -31,8 +31,8 @@ namespace MatrixProfileTests {
 
     template<typename data_t, typename index_t, size_t n, size_t m>
     struct MatrixProfileKernel {
-        struct ComputePack { data_t df, dg, inv; };
-        virtual void MatrixProfileKernelTLF(const data_t *QT, const ComputePack *data, data_t *MP, index_t *MPI) = 0;
+        struct InputDataPack { data_t QT, df, dg, inv; };
+        virtual void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) = 0;
     };
 
     template<typename data_t>
@@ -82,8 +82,8 @@ namespace MatrixProfileTests {
             EuclideanDistance[i] = std::sqrt(2 * m * (1 - PearsonCorrelations[i]));
     }
 
-    template<typename data_t, typename index_t, size_t n, size_t m, typename ComputePack>
-    void PrecomputeStatistics(const std::array<data_t, n> &T, std::array<data_t, n - m + 1> &QT, std::array<ComputePack, n - m + 1> &data) {
+    template<typename data_t, typename index_t, size_t n, size_t m, typename InputDataPack>
+    void PrecomputeStatistics(const std::array<data_t, n> &T, std::array<InputDataPack, n - m + 1> &data) {
         // Calculate the initial mean, then update using moving mean.
         data_t mean = std::accumulate(T.begin(), T.begin() + m, static_cast<data_t>(0)); mean /= m;
         data_t prev_mu, mu0 = mean;
@@ -97,9 +97,9 @@ namespace MatrixProfileTests {
                                     : static_cast<data_t>(0);
             data[i].dg = (i > 0) ? ((T[i + m - 1] - mean) + (T[i - 1] - prev_mu)) 
                                     : static_cast<data_t>(0);
-            QT[i] = 0; data[i].inv = 0;
+            data[i].QT = 0; data[i].inv = 0;
             for (index_t k = 0; k < m; ++k) {
-                QT[i]  += (T[i + k] - mean) * (T[k] - mu0);
+                data[i].QT += (T[i + k] - mean) * (T[k] - mu0);
                 data[i].inv += (T[i + k] - mean) * (T[i + k] - mean);
             }
             data[i].inv = static_cast<data_t>(1) / std::sqrt(data[i].inv);
@@ -113,11 +113,11 @@ namespace MatrixProfileTests {
         std::array<data_t, n - m + 1> P, MP;
         std::array<index_t, n - m + 1> MPI;
 
-        using ComputePack = typename MatrixProfileKernel<data_t, index_t, n, m>::ComputePack;
+        using InputDataPack = typename MatrixProfileKernel<data_t, index_t, n, m>::InputDataPack;
 
-        std::array<data_t, n - m + 1> QT; std::array<ComputePack, n - m + 1> data;
-        PrecomputeStatistics<data_t, index_t, n, m, ComputePack>(T, QT, data);
-        kernel.MatrixProfileKernelTLF(QT.data(), data.data(), P.data(), MPI.data());
+        std::array<InputDataPack, n - m + 1> data;
+        PrecomputeStatistics<data_t, index_t, n, m, InputDataPack>(T, data);
+        kernel.MatrixProfileKernelTLF(data.data(), P.data(), MPI.data());
 
         // Convert Pearson Correlation to Euclidean Distance
         PearsonCorrelationToEuclideanDistance<data_t, index_t, n, m>(P, MP);

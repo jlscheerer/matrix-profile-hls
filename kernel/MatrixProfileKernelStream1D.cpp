@@ -17,13 +17,7 @@
 
 static constexpr size_t stream_d = 3;
 
-struct ScatterPack {
-    data_t QT;
-    ComputePack data;
-    ScatterPack() = default;
-    ScatterPack(data_t QT, ComputePack data)
-        : QT(QT), data(data) {}
-};
+struct ComputePack { data_t df, dg, inv; };
 
 struct ComputationPack {
     ComputePack row;
@@ -34,27 +28,29 @@ struct ComputationPack {
         : row(row), aggregate(aggregate), QTforward(QTforward) {}
 };
 
-void MemoryToStream(const data_t *QT, 
-                    const ComputePack *data, 
-                    stream<ScatterPack, stream_d> &scatter,
+void MemoryToStream(const InputDataPack *in, 
+                    stream<InputDataPack, stream_d> &scatter,
                     stream<ComputationPack, stream_d> &compute) {
     MemoryToStreamScatter:
     for (index_t i = 0; i < n - m + 1; ++i) {
-        scatter.write(ScatterPack{QT[i], data[i]});
+        const InputDataPack read = in[i];
+        scatter.write(read);
     }
     
     MemoryToStreamCompute:
     for (index_t i = 0; i < n - m + 1; ++i) {
-        compute.write(ComputationPack{data[i], aggregate_t_init, 0});
+        const InputDataPack read = in[i];
+        const ComputePack readCompute = ComputePack{read.df, read.dg, read.inv};
+        compute.write(ComputationPack{readCompute, aggregate_t_init, 0});
     }
 
 }
 
 void ProcessingElement(const int stage, 
-                       stream<ScatterPack, stream_d> &scatter_in,
+                       stream<InputDataPack, stream_d> &scatter_in,
                        stream<ComputationPack, stream_d> &compute_in,
                        stream<aggregate_t, stream_d> &reduce_in,
-                       stream<ScatterPack, stream_d> &scatter_out,
+                       stream<InputDataPack, stream_d> &scatter_out,
                        stream<ComputationPack, stream_d> &compute_out,
                        stream<aggregate_t, stream_d> &reduce_out) {
     ComputePack column[t];
@@ -72,10 +68,11 @@ void ProcessingElement(const int stage,
 
     MatrixProfileScatter:
     for (index_t i = 0; i < n - m + 1 - t * stage; ++i) {
-        ScatterPack read = scatter_in.read();
+        const InputDataPack read = scatter_in.read();
+        const ComputePack compute = ComputePack{read.df, read.dg, read.inv};
         if (i < t) {
             QT[i] = read.QT;
-            column[i] = read.data;
+            column[i] = compute;
         } else scatter_out.write(read);
     }
 
@@ -150,23 +147,21 @@ void StreamToMemory(stream<ComputationPack, stream_d> &compute,
     }
 }
 
-void MatrixProfileKernelTLF(const data_t *QTInit, 
-                            const ComputePack *data,
+void MatrixProfileKernelTLF(const InputDataPack *in,
                             data_t *MP, index_t *MPI) {
-    #pragma HLS INTERFACE m_axi port=QTInit offset=slave bundle=gmem0
-    #pragma HLS INTERFACE m_axi port=data   offset=slave bundle=gmem1
-    #pragma HLS INTERFACE m_axi port=MP     offset=slave bundle=gmem2
-    #pragma HLS INTERFACE m_axi port=MPI    offset=slave bundle=gmem3
+    #pragma HLS INTERFACE m_axi port=in  offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=MP  offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem1
 
     #pragma HLS DATAFLOW
 
     constexpr index_t nPE = (n - m + t) / t;
 
-    stream<ScatterPack, stream_d> scatter[nPE + 1];
+    stream<InputDataPack, stream_d> scatter[nPE + 1];
     stream<ComputationPack, stream_d> compute[nPE + 1];
     stream<aggregate_t, stream_d> reduce[nPE + 1];
 
-    MemoryToStream(QTInit, data, scatter[0], compute[0]);
+    MemoryToStream(in, scatter[0], compute[0]);
 
     for (index_t i = 0; i < nPE; ++i) {
         #pragma HLS UNROLL

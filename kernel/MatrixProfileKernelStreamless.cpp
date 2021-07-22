@@ -13,11 +13,12 @@
     #include "hls_math.h"
 #endif
 
-void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_t *MP, index_t *MPI) {
-    #pragma HLS INTERFACE m_axi port=QTInit offset=slave bundle=gmem0
-    #pragma HLS INTERFACE m_axi port=data   offset=slave bundle=gmem1
-    #pragma HLS INTERFACE m_axi port=MP     offset=slave bundle=gmem2
-    #pragma HLS INTERFACE m_axi port=MPI    offset=slave bundle=gmem3
+struct ComputePack { data_t df, dg, inv; };
+
+void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
+    #pragma HLS INTERFACE m_axi port=in  offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=MP  offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem1
 
     data_t QT[n - m + 1];
     ComputePack columnData[n - m + 1]; aggregate_t columnAggregate[n - m + 1];
@@ -25,10 +26,12 @@ void MatrixProfileKernelTLF(const data_t *QTInit, const ComputePack *data, data_
 
     MatrixProfileInit:
     for (index_t i = 0; i < n - m + 1; ++i) {
-       	#pragma HLS PIPELINE II=2
-        QT[i] = QTInit[i];
-        rowData[i] = data[i];
-        columnData[i] = data[i];
+       	#pragma HLS PIPELINE II=1
+        const InputDataPack read = in[i];
+        const ComputePack compute = ComputePack{read.df, read.dg, read.inv};
+        QT[i] = read.QT;
+        rowData[i] = compute;
+        columnData[i] = compute;
     }
 
     aggregate_t rowReduce[16];
