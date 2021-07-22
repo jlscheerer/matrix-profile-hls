@@ -33,12 +33,14 @@ void MemoryToStream(const InputDataPack *in,
                     stream<ComputationPack, stream_d> &compute) {
     MemoryToStreamScatter:
     for (index_t i = 0; i < n - m + 1; ++i) {
+        #pragma HLS PIPELINE II=1
         const InputDataPack read = in[i];
         scatter.write(read);
     }
     
     MemoryToStreamCompute:
     for (index_t i = 0; i < n - m + 1; ++i) {
+        #pragma HLS PIPELINE II=1
         const InputDataPack read = in[i];
         const ComputePack readCompute = ComputePack{read.df, read.dg, read.inv};
         compute.write(ComputationPack{readCompute, aggregate_t_init, 0});
@@ -68,6 +70,7 @@ void ProcessingElement(const int stage,
 
     MatrixProfileScatter:
     for (index_t i = 0; i < n - m + 1 - t * stage; ++i) {
+        #pragma HLS PIPELINE II=1
         const InputDataPack read = scatter_in.read();
         const ComputePack compute = ComputePack{read.df, read.dg, read.inv};
         if (i < t) {
@@ -100,6 +103,7 @@ void ProcessingElement(const int stage,
 
         MatrixProfileShiftQT:
         for (index_t j = t - 1; j > 0; --j) {
+            #pragma HLS UNROLL
             QT[j] = QT[j - 1];
         }
 
@@ -109,9 +113,9 @@ void ProcessingElement(const int stage,
     }
     
     const int loopCount = t * (stage + 1) > (n - m + 1) ? (n - m + 1): (t * (stage + 1));
-    
     MatrixProfileReduce:
     for (index_t i = 0; i < loopCount; ++i) {
+        #pragma HLS PIPELINE II=1
         aggregate_t read = (i >= t * stage) 
                 ? columnAggregate[i - t * stage] : reduce_in.read();
         reduce_out.write(read);
@@ -123,24 +127,19 @@ void StreamToMemory(stream<ComputationPack, stream_d> &compute,
                     stream<aggregate_t, stream_d> &reduce,
                     data_t *MP, index_t *MPI) {
     aggregate_t rowAggregates[n - m + 1];
-    aggregate_t columnAggregates[n - m + 1];
 
     StreamToMemoryReduceRow:
     for (index_t i = 0; i < n - m + 1; ++i) {
+        #pragma HLS PIPELINE II=1
         const ComputationPack read = compute.read();
         rowAggregates[i] = read.aggregate;
     }
 
-    StreamToMemoryReduceColumn:
-    for (index_t i = 0; i < n - m + 1; ++i) {
-        const aggregate_t read = reduce.read();
-        columnAggregates[i] = read;
-    }
-
     StreamToMemoryReduce:
     for (int i = 0; i < n - m + 1; ++i) {
+        #pragma HLS PIPELINE II=1
         const aggregate_t rowAggregate = rowAggregates[i];
-        const aggregate_t columnAggregate = columnAggregates[i];
+        const aggregate_t columnAggregate = reduce.read();
         const aggregate_t aggregate = rowAggregate.value > columnAggregate.value ? rowAggregate : columnAggregate;
         MP[i] = aggregate.value;
         MPI[i] = aggregate.index;
