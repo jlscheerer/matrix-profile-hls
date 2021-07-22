@@ -13,6 +13,8 @@
     #include "hls_math.h"
 #endif
 
+// Structure containing all values required for Update
+// Computation and Conversion to PearsonCorrelation
 struct ComputePack { data_t df, dg, inv; };
 
 void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
@@ -21,19 +23,29 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
     #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem1
 
     data_t QT[n - m + 1];
-    ComputePack columnData[n - m + 1]; aggregate_t columnAggregate[n - m + 1];
-    ComputePack rowData[n - m + 1]; aggregate_t rowAggregate[n - m + 1];
+    ComputePack columnData[n - m + 1], rowData[n - m + 1];
+    
+    // Store computed row aggregates to merge with column 
+    // aggregates during the final reduction stage
+    aggregate_t rowAggregates[n - m + 1];
 
     MatrixProfileInit:
     for (index_t i = 0; i < n - m + 1; ++i) {
        	#pragma HLS PIPELINE II=1
         const InputDataPack read = in[i];
         const ComputePack compute = ComputePack{read.df, read.dg, read.inv};
+
+        // Store read QT value in seperate arary will be updated
+        // during the actual computation
         QT[i] = read.QT;
+
+        // explicitely store two copies of the input data to
+        // later access both independently in a single cycle 
         rowData[i] = compute;
         columnData[i] = compute;
     }
 
+    // TODO: Comment Breaking Dependency by Introducing "Delay-Buffer"
     aggregate_t rowReduce[16];
     #pragma HLS ARRAY_PARTITION variable=rowReduce complete
 
@@ -41,8 +53,8 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
     // Because for every row we perform a reduction on all elements!
     // For every n - m + 1 >= 16 we handle this via implicit initializaiton
     for (index_t i = 0; i < 16; ++i) {
-	#pragma HLS UNROLL
-	rowReduce[i] = aggregate_t_init;
+	    #pragma HLS UNROLL
+	    rowReduce[i] = aggregate_t_init;
     }
 
     constexpr int T = 4;
@@ -63,9 +75,11 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
             const ComputePack column = (!exclusionZone && computationInRange)
                                             ? columnData[columnIndex] : (ComputePack){0, 0, 0};
 
-	    QT[i] += row.df * column.dg + column.df * row.dg;
+	        // Update QT value diagonally above via the update formulation
+            // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
+            QT[i] += row.df * column.dg + column.df * row.dg;
 
-            // calculate pearson correlation
+            // Calculate PearsonCorrelation
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
             const data_t P = QT[i] * row.inv * column.inv;
 
@@ -74,33 +88,32 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
             rowReduce[i % 16] = P > prevRow.value ? aggregate_t(P, columnIndex) : prevRow;
 
             // Column-Wise Partial Reduction
-            // Wrap-Around works because if we are not outside the exlusionZone value will be 0
+            // Wrap-Around works because if we are not outside 
+            // the exlusionZone P will be 0 and therefore irrelevant
             aggregate_t prevColumn = (k < T/2) ? aggregate_t_init : columnReduce[columnIndex % (n - m + 1)][k % T];
-	    columnReduce[columnIndex % (n - m + 1)][(k + T/2) % T] = prevColumn.value > P ? prevColumn : aggregate_t(P, k);
+	        columnReduce[columnIndex % (n - m + 1)][(k + T/2) % T] = prevColumn.value > P ? prevColumn : aggregate_t(P, k);
         }
 
-        rowAggregate[k] = TreeReduce::Maximum<aggregate_t, 16>(rowReduce);
+        // Only need to reduce a constant number (16) of 
+        // aggregates via guaranteed TreeReduction
+        rowAggregates[k] = TreeReduce::Maximum<aggregate_t, 16>(rowReduce);
     }
     // =============== [/Compute] ===============
     
     // =============== [Reduce] ===============
-#if 0
-    ReduceColumns:
-    for (int i = 0; i < n - m + 1; ++i) {
-	// needs to read four elements per iteration to reduce
-	#pragma HLS PIPELINE II=1
-    	columnAggregate[i] = TreeReduce::Maximum<aggregate_t, T>(columnReduce[i]);
-    }
-#endif
 
-    // compute maximum between row- and column-wise aggregates
+    // Compute maximum between Row- and Column-wise aggregates
     ReductionCompute:
     for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
-	const aggregate_t rowAggregateV = rowAggregate[i];
-	const aggregate_t columnAggregateV = TreeReduce::Maximum<aggregate_t, T>(columnReduce[i]);
-        const aggregate_t aggregate = rowAggregateV.value > columnAggregateV.value
-					? rowAggregateV : columnAggregateV;
+	    // Load rowAggregate we computed directly
+        const aggregate_t rowAggregate = rowAggregates[i];
+        // Compute columnAggregate by performing TreeReduction on partial results
+	    const aggregate_t columnAggregate = TreeReduce::Maximum<aggregate_t, T>(columnReduce[i]);
+        // Compute Maximum of both aggregates (i.e. values with lowest PearsonCorrelation)
+        const aggregate_t aggregate = rowAggregate.value > columnAggregate.value
+					? rowAggregate : columnAggregate;
+        // Store the Result
         MP[i] = aggregate.value;
         MPI[i] = aggregate.index;
     }
