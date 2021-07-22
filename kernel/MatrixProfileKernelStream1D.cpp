@@ -57,14 +57,13 @@ void ProcessingElement(const int stage,
                        stream<aggregate_t, stream_d> &reduce_out) {
     ComputePack column[t];
     aggregate_t columnAggregate[t];
-    data_t QT[t], P[t];
+    data_t QT[t];
 
     // TODO: Change to implicit initiation
     MatrixProfileInit:
     for (index_t i = 0; i < t; ++i) {
         columnAggregate[i] = aggregate_t_init;
         QT[i] = 0;
-        P[i] = 0;
         column[i] = {0, 0, 0};
     }
 
@@ -79,34 +78,48 @@ void ProcessingElement(const int stage,
         } else scatter_out.write(read);
     }
 
+    aggregate_t rowReduce[8][16];
+    #pragma HLS ARRAY_PARTITION variable=rowReduce dim=2 complete
+
+    // TODO: Only required for t <= 16
+    MatrixProfileInitReduce:
+    for (index_t i = 0; i < 8; ++i) {
+	for (index_t j = 0; j < 16; ++j) {
+	  #pragma HLS UNROLL
+	  rowReduce[i][j] = aggregate_t_init;
+	}
+    }
+
     MatrixProfileCompute:
     for (index_t i = 0; i < n - m + 1; ++i) {
         const ComputationPack read = compute_in.read();
 
         const ComputePack row = read.row;
         const data_t QTbackward = read.QTforward;
-        aggregate_t rowAggregate = read.aggregate;
+        aggregate_t aggregateBackward = read.aggregate;
 
         MatrixProfileTile:
         for (index_t j = 0; j < t; ++j) {
             QT[j] += row.df * column[j].dg + column[j].df * row.dg;
             const bool inBounds = i <= stage * t + j - (m / 4);
 
-            P[j] = inBounds ? QT[j] * row.inv * column[j].inv : 0;
-            
-            columnAggregate[j] = (P[j] > columnAggregate[j].value) ? aggregate_t{P[j], i} : columnAggregate[j];
-            rowAggregate = P[j] > rowAggregate.value ? aggregate_t{P[j], stage * t + j} : rowAggregate;
-        }
+            const data_t P = inBounds ? QT[j] * row.inv * column[j].inv : 0;
 
-        // shift values in QTforward
+            columnAggregate[j] = (P > columnAggregate[j].value) ? aggregate_t{P, i} : columnAggregate[j];
+            //rowAggregate = P[j] > rowAggregate.value ? aggregate_t{P[j], stage * t + j} : rowAggregate;
+            aggregate_t prevRow = (j < 16) ? aggregateBackward : rowReduce[i % 8][j % 16];
+	    rowReduce[i % 8][j % 16] = P > prevRow.value ? aggregate_t(P, stage * t + j) : prevRow;
+	}
+
+	aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, 16>(rowReduce[i % 8]);
+
+        // shift values in QT forward
         data_t QTforward = QT[t - 1];
-
         MatrixProfileShiftQT:
         for (index_t j = t - 1; j > 0; --j) {
-            #pragma HLS UNROLL
+            #pragma HLS PIPELINE II=1
             QT[j] = QT[j - 1];
         }
-
         QT[0] = QTbackward;
 
         compute_out.write(ComputationPack{row, rowAggregate, QTforward});
