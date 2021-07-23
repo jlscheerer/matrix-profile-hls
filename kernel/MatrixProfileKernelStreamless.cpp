@@ -111,7 +111,7 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
         const aggregate_t rowAggregate = rowAggregates[i];
         // Compute columnAggregate by performing TreeReduction on partial results
 	    const aggregate_t columnAggregate = TreeReduce::Maximum<aggregate_t, T>(columnReduce[i]);
-        // Compute Maximum of both aggregates (i.e. values with lowest PearsonCorrelation)
+        // Compute Maximum of both aggregates (i.e. values with lowest EuclideanDistance)
         const aggregate_t aggregate = rowAggregate.value > columnAggregate.value
 					? rowAggregate : columnAggregate;
         // Store the Result
