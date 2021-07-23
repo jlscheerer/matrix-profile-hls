@@ -13,24 +13,14 @@
     using hls::stream;
 #endif
 
+#include "kernel/DataPacks.hpp"
 #include "kernel/TreeReduce.hpp"
 
 static constexpr size_t stream_d = 3;
 
-struct ComputePack { data_t df, dg, inv; };
-
-struct ComputationPack {
-    ComputePack row;
-    aggregate_t aggregate;
-    data_t QTforward;
-    ComputationPack() = default;
-    ComputationPack(ComputePack row, aggregate_t aggregate, data_t QTforward)
-        : row(row), aggregate(aggregate), QTforward(QTforward) {}
-};
-
 void MemoryToStream(const InputDataPack *in, 
                     stream<InputDataPack, stream_d> &scatter,
-                    stream<ComputationPack, stream_d> &compute) {
+                    stream<ComputePack, stream_d> &compute) {
     MemoryToStreamScatter:
     for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
@@ -42,36 +32,30 @@ void MemoryToStream(const InputDataPack *in,
     for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
         const InputDataPack read = in[i];
-        const ComputePack readCompute = ComputePack{read.df, read.dg, read.inv};
-        compute.write(ComputationPack{readCompute, aggregate_t_init, 0});
+        const DataPack readCompute(read.df, read.dg, read.inv);
+        compute.write({readCompute, aggregate_t_init, 0});
     }
 
 }
 
 void ProcessingElement(const int stage, 
                        stream<InputDataPack, stream_d> &scatter_in,
-                       stream<ComputationPack, stream_d> &compute_in,
+                       stream<ComputePack, stream_d> &compute_in,
                        stream<aggregate_t, stream_d> &reduce_in,
                        stream<InputDataPack, stream_d> &scatter_out,
-                       stream<ComputationPack, stream_d> &compute_out,
+                       stream<ComputePack, stream_d> &compute_out,
                        stream<aggregate_t, stream_d> &reduce_out) {
-    ComputePack column[t];
+    DataPack column[t];
     aggregate_t columnAggregate[t];
     data_t QT[t];
 
-    // TODO: Change to implicit initiation
-    MatrixProfileInit:
-    for (index_t i = 0; i < t; ++i) {
-        columnAggregate[i] = aggregate_t_init;
-        QT[i] = 0;
-        column[i] = {0, 0, 0};
-    }
+    const index_t columnBounds = n - m + 1 - t * stage;
 
     MatrixProfileScatter:
     for (index_t i = 0; i < n - m + 1 - t * stage; ++i) {
         #pragma HLS PIPELINE II=1
         const InputDataPack read = scatter_in.read();
-        const ComputePack compute = ComputePack{read.df, read.dg, read.inv};
+        const DataPack compute(read.df, read.dg, read.inv);
         if (i < t) {
             QT[i] = read.QT;
             column[i] = compute;
@@ -84,34 +68,38 @@ void ProcessingElement(const int stage,
     // TODO: Only required for t <= 16
     MatrixProfileInitReduce:
     for (index_t i = 0; i < 8; ++i) {
-	for (index_t j = 0; j < 16; ++j) {
-	  #pragma HLS UNROLL
-	  rowReduce[i][j] = aggregate_t_init;
-	}
+        for (index_t j = 0; j < 16; ++j) {
+            #pragma HLS UNROLL
+            rowReduce[i][j] = aggregate_t_init;
+        }
     }
 
     MatrixProfileCompute:
     for (index_t i = 0; i < n - m + 1; ++i) {
-        const ComputationPack read = compute_in.read();
+        const ComputePack read = compute_in.read();
 
-        const ComputePack row = read.row;
+        const DataPack row = read.row;
         const data_t QTbackward = read.QTforward;
         aggregate_t aggregateBackward = read.aggregate;
 
         MatrixProfileTile:
         for (index_t j = 0; j < t; ++j) {
-            QT[j] += row.df * column[j].dg + column[j].df * row.dg;
+            const DataPack col = (j < columnBounds) 
+                ? column[j] : DataPack(0);
+            
+            QT[j] += row.df * col.dg + col.df * row.dg;
             const bool inBounds = i <= stage * t + j - (m / 4);
 
-            const data_t P = inBounds ? QT[j] * row.inv * column[j].inv : 0;
+            const data_t P = inBounds ? QT[j] * row.inv * col.inv : 0;
 
-            columnAggregate[j] = (P > columnAggregate[j].value) ? aggregate_t{P, i} : columnAggregate[j];
-            //rowAggregate = P[j] > rowAggregate.value ? aggregate_t{P[j], stage * t + j} : rowAggregate;
+            const aggregate_t prevColumn = (i > 0) ? columnAggregate[j] : aggregate_t_init;
+            columnAggregate[j] = (P > prevColumn.value) ? aggregate_t{P, i} : prevColumn;
+
             aggregate_t prevRow = (j < 16) ? aggregateBackward : rowReduce[i % 8][j % 16];
-	    rowReduce[i % 8][j % 16] = P > prevRow.value ? aggregate_t(P, stage * t + j) : prevRow;
-	}
+	        rowReduce[i % 8][j % 16] = P > prevRow.value ? aggregate_t(P, stage * t + j) : prevRow;
+	    }
 
-	aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, 16>(rowReduce[i % 8]);
+	    aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, 16>(rowReduce[i % 8]);
 
         // shift values in QT forward
         data_t QTforward = QT[t - 1];
@@ -122,7 +110,7 @@ void ProcessingElement(const int stage,
         }
         QT[0] = QTbackward;
 
-        compute_out.write(ComputationPack{row, rowAggregate, QTforward});
+        compute_out.write({row, rowAggregate, QTforward});
     }
     
     const int loopCount = t * (stage + 1) > (n - m + 1) ? (n - m + 1): (t * (stage + 1));
@@ -136,7 +124,7 @@ void ProcessingElement(const int stage,
 
 }
 
-void StreamToMemory(stream<ComputationPack, stream_d> &compute, 
+void StreamToMemory(stream<ComputePack, stream_d> &compute, 
                     stream<aggregate_t, stream_d> &reduce,
                     data_t *MP, index_t *MPI) {
     aggregate_t rowAggregates[n - m + 1];
@@ -144,7 +132,7 @@ void StreamToMemory(stream<ComputationPack, stream_d> &compute,
     StreamToMemoryReduceRow:
     for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
-        const ComputationPack read = compute.read();
+        const ComputePack read = compute.read();
         rowAggregates[i] = read.aggregate;
     }
 
@@ -170,7 +158,7 @@ void MatrixProfileKernelTLF(const InputDataPack *in,
     constexpr index_t nPE = (n - m + t) / t;
 
     stream<InputDataPack, stream_d> scatter[nPE + 1];
-    stream<ComputationPack, stream_d> compute[nPE + 1];
+    stream<ComputePack, stream_d> compute[nPE + 1];
     stream<aggregate_t, stream_d> reduce[nPE + 1];
 
     MemoryToStream(in, scatter[0], compute[0]);
