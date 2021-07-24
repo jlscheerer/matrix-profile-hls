@@ -297,7 +297,7 @@ if(BUILD_TESTS)
     enable_testing()
 
     include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
-    include_directories(${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/test/include)
+    include_directories(${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/include/ ${PROJECT_SOURCE_DIR}/test/include)
 
     add_executable(testStreamlessKernel "${PROJECT_SOURCE_DIR}/test/TestStreamlessKernel.cpp")
     target_link_libraries(testStreamlessKernel gtest gtest_main)

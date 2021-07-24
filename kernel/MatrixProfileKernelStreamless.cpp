@@ -6,26 +6,35 @@
 
 #if !defined(TEST_MOCK_SW)
     #include "Config.hpp"
+    
     #include "kernel/MatrixProfileKernel.hpp"
+    #include "kernel/TreeReduce.hpp"
 
     #include "hls_math.h"
-    #include "kernel/HLSMathUtil.hpp"
 #endif
+
 
 data_t PearsonCorrelationToEuclideanDistance(data_t PearsonCorrelation) {
     #pragma HLS INLINE
     return sqrt(static_cast<data_t>(2 * m * (1 - PearsonCorrelation)));
 }
 
+// Structure containing all values required for Update
+// Computation and Conversion to PearsonCorrelation
+struct ComputePack { data_t df, dg, inv; };
+
 void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     #pragma HLS INTERFACE m_axi port=T   offset=slave bundle=gmem0
     #pragma HLS INTERFACE m_axi port=MP  offset=slave bundle=gmem1
     #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem2
 
-    data_t mu[sublen], df[sublen], dg[sublen], inv[sublen];
-    data_t QT[sublen], P[sublen];
+    data_t QT[sublen];
+    ComputePack columnData[n - m + 1], rowData[n - m + 1];
 
-    aggregate_t aggregate_m[sublen];
+    // Store computed row aggregates to merge with column 
+    // aggregates during the final reduction stage
+    aggregate_t rowAggregates[n - m + 1];
+
     // =============== [Precompute] ===============
     // use T_m as shift register containing the previous m T elements
     // need to be able to access these elements with no contention
@@ -47,9 +56,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     mean /= m;
 
     // calculate initial values
-    data_t mu0 = mean; 
-    mu[0] = mu0; df[0] = 0; dg[0] = 0;
-
+    data_t mu0 = mean;
     PrecomputationInitInvQT:
     for (index_t k = 0; k < m; ++k) {
         inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
@@ -57,10 +64,10 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     }
 
     data_t inv0 = static_cast<data_t>(1) / sqrt(inv_sum);
-    inv[0] = inv0; QT[0] = qt_sum; P[0] = 1;
 
-    // Assumption: will always be in the exclusionZone
-    aggregate_m[0] = aggregate_t_init;
+    const ComputePack compute0 = {0, 0, inv0};
+    columnData[0] = compute0; rowData[0] = compute0;
+    QT[0] = qt_sum;
 
     // Maximum PearsonCorrelation and corresponding Index for the first row
     aggregate_t rowAggregate_m = aggregate_t_init;
@@ -73,9 +80,10 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         mean += (T_i - T_r) / m;
 
         // calculate df: (T[i+m-1] - T[i-1]) / 2
-        df[i - m + 1] = (T_i - T_r) / 2;
+        const data_t df = (T_i - T_r) / 2;
+
         // calculate dg: (T[i+m-1] - μ[i]) * (T[i-1] - μ[i-1])
-        dg[i - m + 1] = (T_i - mean) + (T_r - prev_mean);
+        const data_t dg = (T_i - mean) + (T_r - prev_mean);
 
         inv_sum = 0; qt_sum = 0;
         PrecomputationComputeUpdateInvQT:
@@ -83,23 +91,15 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
         }
-
         // perform last element of the loop separately (this requires the new value)
         inv_sum += (T_i - mean) * (T_i - mean);
-        inv[i - m + 1] = static_cast<data_t>(1) / sqrt(inv_sum);
-
         qt_sum += (T_i - mean) * (Ti_m[m - 1] - mu0);
+
+        const data_t inv = static_cast<data_t>(1) / sqrt(inv_sum);
+
+        const ComputePack compute = {df, dg, inv};
         QT[i - m + 1] = qt_sum;
-
-        // calculate Pearson Correlation: P_{i, j} = QT_{i, j} * inv_i * inv_j
-        P[i - m + 1] = qt_sum * inv0 * (static_cast<data_t>(1) / sqrt(inv_sum));
-
-        bool exclusionZone = (i - m + 1) < m / 4;
-        if(!exclusionZone) aggregate_m[i - m + 1] = {P[i - m + 1], 0};
-        else aggregate_m[i - m + 1] = aggregate_t_init;
-
-        if (!exclusionZone && P[i - m + 1] > rowAggregate_m.value)
-            rowAggregate_m = {P[i - m + 1], static_cast<index_t>(i - m + 1)};
+        columnData[i - m + 1] = compute; rowData[i - m + 1] = compute;
 
         // shift all values in T_m back
         PrecomputationComputeShift: 
@@ -108,55 +108,80 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         T_m[m - 1] = T_i;
     }
 
-    // set the aggregates for the first row
-    if (rowAggregate_m.value > aggregate_m[0].value)
-        aggregate_m[0] = rowAggregate_m;
     // =============== [/Precompute] ===============
 
+    // TODO: Comment Breaking Dependency by Introducing "Delay-Buffer"
+    aggregate_t rowReduce[16];
+    #pragma HLS ARRAY_PARTITION variable=rowReduce complete
+
+    // rowReduce needs to be explicitly initialized if n - m + 1 < 16
+    // Because for every row we perform a reduction on all elements!
+    // For every n - m + 1 >= 16 we handle this via implicit initializaiton
+    for (index_t i = 0; i < 16; ++i) {
+	    #pragma HLS UNROLL
+	    rowReduce[i] = aggregate_t_init;
+    }
+
+    // TODO: Comment "Double-Buffer" Write to opposite position than is being read
+    // TODO: Clean-Up Access to columnReduce
+    constexpr int TBuf = 2;
+    aggregate_t columnReduce[n - m + 1][TBuf];
+
     // =============== [/Compute] ===============
-    // Do the actual calculations via updates
     MatrixProfileComputeRow:
-    for (index_t k = 1; k < n - m + 1; ++k) {
-        // exclusionZone integrated into loop bounds
-        // exclusionZone <==> row - m/4 <= column <= row + m/4
-        //               <==> column <= row + m/4 [(row <= column, m > 0) ==> row - m/4 <= column]
-        //               <==> row + k <= row + m/4
-        //               <==> k <= m/4
+    for (index_t k = 0; k < n - m + 1; ++k) {
         MatrixProfileComputeColumn:
-        for (index_t i = (m / 4); i < n - m + 1; ++i) {
-            data_t dfi = df[k], dgi = dg[k], invi = inv[k];
+        for (index_t i = 0; i < n - m + 1; ++i) {
+            #pragma HLS PIPELINE II=1
+            const index_t columnIndex = k + i;
+            const bool computationInRange = k + i < n - m + 1;
+            const bool exclusionZone = i < (m / 4);
 
-            const bool computationInRange = k + i < sublen;
-            const data_t dfj = computationInRange ? df[k + i] : static_cast<data_t>(0);
-            const data_t dgj = computationInRange ? dg[k + i] : static_cast<data_t>(0);
-            const data_t invj = computationInRange ? inv[k + i] : static_cast<data_t>(0);
+            const ComputePack row = rowData[k];
+            const ComputePack column = (!exclusionZone && computationInRange)
+                                            ? columnData[columnIndex] : (ComputePack){0, 0, 0};
 
+	        // Update QT value diagonally above via the update formulation
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
-            // QT[k] was the previous value (i.e. value diagonally above the current QT[k])
-            QT[i] += dfi * dgj + dfj * dgi;
+            QT[i] += row.df * column.dg + column.df * row.dg;
 
-            // calculate pearson correlation
+            // Calculate PearsonCorrelation
             // P_{i, j} = QT_{i, j} * inv_i * inv_j
-            P[i] = QT[i] * inv[k] * invj;
+            const data_t P = QT[i] * row.inv * column.inv;
 
-            // Update Aggregates
-            const index_t column = k + i;
-            if(computationInRange && P[i] > aggregate_m[k].value)
-                aggregate_m[k] = {P[i], static_cast<index_t>(column)};
-            if(computationInRange && P[i] > aggregate_m[column].value)
-                aggregate_m[column] = {P[i], static_cast<index_t>(k)};
+            // Row-Wise Partial Reduction
+            aggregate_t prevRow = (i < 16) ? aggregate_t_init : rowReduce[i % 16];
+            rowReduce[i % 16] = P > prevRow.value ? aggregate_t(P, columnIndex) : prevRow;
+
+            // Column-Wise Partial Reduction
+            // Wrap-Around works because if we are not outside 
+            // the exlusionZone P will be 0 and therefore irrelevant
+            aggregate_t prevColumn = (k < TBuf/2) ? aggregate_t_init : columnReduce[columnIndex % (n - m + 1)][k % TBuf];
+	        columnReduce[columnIndex % (n - m + 1)][(k + TBuf/2) % TBuf] = prevColumn.value > P ? prevColumn : aggregate_t(P, k);
         }
+
+        // Only need to reduce a constant number (16) of 
+        // aggregates via guaranteed TreeReduction
+        rowAggregates[k] = TreeReduce::Maximum<aggregate_t, 16>(rowReduce);
     }
     // =============== [/Compute] ===============
     
     // =============== [Reduce] ===============
-    // Just always take the max
+
+    // Compute maximum between Row- and Column-wise aggregates
     ReductionCompute:
-    for (index_t i = 0; i < sublen; ++i) {
+    for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
-        // Take the max and compute EuclideanDistance
-        MP[i]  = PearsonCorrelationToEuclideanDistance(aggregate_m[i].value);
-        MPI[i] = aggregate_m[i].index;
+	    // Load rowAggregate we computed directly
+        const aggregate_t rowAggregate = rowAggregates[i];
+        // Compute columnAggregate by performing TreeReduction on partial results
+	    const aggregate_t columnAggregate = TreeReduce::Maximum<aggregate_t, TBuf>(columnReduce[i]);
+        // Compute Maximum of both aggregates (i.e. values with lowest EuclideanDistance)
+        const aggregate_t aggregate = rowAggregate.value > columnAggregate.value
+					? rowAggregate : columnAggregate;
+        // Store the Result
+        MP[i] = PearsonCorrelationToEuclideanDistance(aggregate.value);
+        MPI[i] = aggregate.index;
     }
     // =============== [/Reduce] ===============
 }
