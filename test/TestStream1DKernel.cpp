@@ -58,12 +58,12 @@ namespace MatrixProfileTests {
     }
 
     TEST(TestStream1DKernel, TestBenchmark1024SynM20T500) {
-        Stream1DKernel<double, int, 1024, 20, 500> kernel;
+        Stream1DKernel<double, int, 1024, 16, 500> kernel;
         TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
     }
 
     TEST(TestStream1DKernel, TestBenchmark1024SynM20T1000) {
-        Stream1DKernel<double, int, 1024, 20, 1000> kernel;
+        Stream1DKernel<double, int, 1024, 16, 1000> kernel;
         TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
     }
 
