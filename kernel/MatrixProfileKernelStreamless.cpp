@@ -48,7 +48,8 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     data_t mu0 = 0, inv_sum = 0, qt_sum = 0;
     PrecomputationInitTMu:
     for (index_t i = 0; i < m; ++i) {
-        data_t T_i = T[i];
+        #pragma HLS PIPELINE II=1
+	data_t T_i = T[i];
         mu0 += T_i;
         T_m[i] = T_i;
         Ti_m[i] = T_i;
@@ -57,6 +58,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
     PrecomputationInitInvQT:
     for (index_t k = 0; k < m; ++k) {
+	#pragma HLS PIPELINE II=1
         inv_sum += (T_m[k] - mu0) * (T_m[k] - mu0);
         qt_sum += (T_m[k] - mu0) * (Ti_m[k] - mu0);
     }
@@ -69,9 +71,12 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
     PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
+	#pragma HLS PIPELINE II=1
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
+	// recompute means to break dependency
+	// and therefore achieve lower II
         const data_t prev_mean = TreeReduce::Add<double, m>(T_m) / m;
         const data_t mean = prev_mean + (T_i - T_r) / m;
 
@@ -82,7 +87,6 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         const data_t dg = (T_i - mean) + (T_r - prev_mean);
 
         inv_sum = 0; qt_sum = 0;
-
         PrecomputationComputeUpdateInvQT:
         for (index_t k = 1; k < m; k++) {
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
@@ -116,8 +120,8 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     // Because for every row we perform a reduction on all elements!
     // For every n - m + 1 >= 16 we handle this via implicit initializaiton
     for (index_t i = 0; i < 16; ++i) {
-	    #pragma HLS UNROLL
-	    rowReduce[i] = aggregate_t_init;
+	#pragma HLS UNROLL
+	rowReduce[i] = aggregate_t_init;
     }
 
     // TODO: Comment "Double-Buffer" Write to opposite position than is being read
@@ -155,7 +159,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
             // Wrap-Around works because if we are not outside 
             // the exlusionZone P will be 0 and therefore irrelevant
             aggregate_t prevColumn = (k < TBuf/2) ? aggregate_t_init : columnReduce[columnIndex % (n - m + 1)][k % TBuf];
-	        columnReduce[columnIndex % (n - m + 1)][(k + TBuf/2) % TBuf] = prevColumn.value > P ? prevColumn : aggregate_t(P, k);
+	    columnReduce[columnIndex % (n - m + 1)][(k + TBuf/2) % TBuf] = prevColumn.value > P ? prevColumn : aggregate_t(P, k);
         }
 
         // Only need to reduce a constant number (16) of 

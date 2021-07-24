@@ -36,7 +36,8 @@ void MemoryToStream(const data_t *T,
     data_t mu0 = 0, inv_sum = 0, qt_sum = 0;
     MemoryToStreamInitTMu:
     for (index_t i = 0; i < m; ++i) {
-        data_t T_i = T[i];
+        #pragma HLS PIPELINE II=1
+	data_t T_i = T[i];
         mu0 += T_i;
         T_m[i] = T_i;
         Ti_m[i] = T_i;
@@ -45,6 +46,7 @@ void MemoryToStream(const data_t *T,
 
     MemoryToStreamInitInvQT:
     for (index_t k = 0; k < m; ++k) {
+	#pragma HLS PIPELINE II=1
         inv_sum += (T_m[k] - mu0) * (T_m[k] - mu0);
         qt_sum += (T_m[k] - mu0) * (Ti_m[k] - mu0);
     }
@@ -55,9 +57,13 @@ void MemoryToStream(const data_t *T,
 
     MemoryToStreamPrecomputeScatter:
     for (index_t i = m; i < n; ++i) {
+	#pragma HLS PIPELINE II=1
+
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
+	// recompute means to break dependency
+        // and therefore achieve lower II
         const data_t prev_mean = TreeReduce::Add<data_t, m>(T_m) / m;
         const data_t mean = prev_mean + (T_i - T_r) / m;
 
@@ -158,10 +164,10 @@ void ProcessingElement(const int stage,
             columnAggregate[j] = (P > prevColumn.value) ? aggregate_t{P, i} : prevColumn;
 
             aggregate_t prevRow = (j < 16) ? aggregateBackward : rowReduce[i % 8][j % 16];
-	        rowReduce[i % 8][j % 16] = P > prevRow.value ? aggregate_t(P, stage * t + j) : prevRow;
-	    }
+	    rowReduce[i % 8][j % 16] = P > prevRow.value ? aggregate_t(P, stage * t + j) : prevRow;
+	}
 
-	    aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, 16>(rowReduce[i % 8]);
+	aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, 16>(rowReduce[i % 8]);
 
         // shift values in QT forward
         data_t QTforward = QT[t - 1];
