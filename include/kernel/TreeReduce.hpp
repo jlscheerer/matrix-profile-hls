@@ -1,12 +1,12 @@
 /**
  * @file    TreeReduce.hpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   Maximum of staticly sized array using guaranteed TreeReduction (fully pipelined)
+ * @brief   Maximum/Add of staticly sized array using guaranteed TreeReduction (fully pipelined)
  */
 
 // Code is inspired by / adapted from: https://github.com/definelicht/hlslib/blob/master/include/hlslib/xilinx/TreeReduce.h
 // Source: https://github.com/definelicht/hlslib
-// Opposed to the original Implementation this only supports the Maximum Operator and Arrays with 2**n elements
+// Opposed to the original Implementation this only supports the Maximum/Sum Operator and Arrays with 2**n elements
 
 #pragma once
 
@@ -74,7 +74,7 @@ namespace TreeReduce {
             #pragma HLS INLINE
             return (a > b) ? a : b;
         }
-        static constexpr T identity() { return std::numeric_limits<T>::min(); }
+        static constexpr T identity() { return 0; }
     private:
         Max() = delete;
         ~Max() = delete;

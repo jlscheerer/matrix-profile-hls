@@ -52,9 +52,8 @@ namespace MatrixProfileTests {
         TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
     }
 
-    TEST(TestStreamlessKernel, TestBenchmark1024SynM20) {
-        StreamlessKernel<double, int, 1024, 20> kernel;
+    TEST(TestStreamlessKernel, TestBenchmark1024SynM16) {
+        StreamlessKernel<double, int, 1024, 16> kernel;
         TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
     }
-
 }
