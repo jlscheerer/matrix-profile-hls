@@ -45,22 +45,20 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     data_t Ti_m[m];
     #pragma HLS ARRAY_PARTITION variable=Ti_m complete
 
-    data_t mean = 0, inv_sum = 0, qt_sum = 0;
+    data_t mu0 = 0, inv_sum = 0, qt_sum = 0;
     PrecomputationInitTMu:
     for (index_t i = 0; i < m; ++i) {
         data_t T_i = T[i];
-        mean += T_i;
+        mu0 += T_i;
         T_m[i] = T_i;
         Ti_m[i] = T_i;
     }
-    mean /= m;
+    mu0 /= m;
 
-    // calculate initial values
-    data_t mu0 = mean;
     PrecomputationInitInvQT:
     for (index_t k = 0; k < m; ++k) {
-        inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
-        qt_sum += (T_m[k] - mean) * (Ti_m[k] - mu0);
+        inv_sum += (T_m[k] - mu0) * (T_m[k] - mu0);
+        qt_sum += (T_m[k] - mu0) * (Ti_m[k] - mu0);
     }
 
     data_t inv0 = static_cast<data_t>(1) / sqrt(inv_sum);
@@ -69,15 +67,13 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
     columnData[0] = compute0; rowData[0] = compute0;
     QT[0] = qt_sum;
 
-    // Maximum PearsonCorrelation and corresponding Index for the first row
-    aggregate_t rowAggregate_m = aggregate_t_init;
     PrecomputationCompute:
     for (index_t i = m; i < n; ++i) {
         data_t T_i = T[i];
         data_t T_r = T_m[0];
 
-        data_t prev_mean = mean;
-        mean += (T_i - T_r) / m;
+        const data_t prev_mean = TreeReduce::Add<double, m>(T_m) / m;
+        const data_t mean = prev_mean + (T_i - T_r) / m;
 
         // calculate df: (T[i+m-1] - T[i-1]) / 2
         const data_t df = (T_i - T_r) / 2;
@@ -86,11 +82,13 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
         const data_t dg = (T_i - mean) + (T_r - prev_mean);
 
         inv_sum = 0; qt_sum = 0;
+
         PrecomputationComputeUpdateInvQT:
         for (index_t k = 1; k < m; k++) {
             inv_sum += (T_m[k] - mean) * (T_m[k] - mean);
             qt_sum += (T_m[k] - mean) * (Ti_m[k - 1] - mu0);
         }
+
         // perform last element of the loop separately (this requires the new value)
         inv_sum += (T_i - mean) * (T_i - mean);
         qt_sum += (T_i - mean) * (Ti_m[m - 1] - mu0);

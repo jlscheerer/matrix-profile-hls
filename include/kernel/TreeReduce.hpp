@@ -74,7 +74,7 @@ namespace TreeReduce {
             #pragma HLS INLINE
             return (a > b) ? a : b;
         }
-        static constexpr T identity() { return std::numeric_limits<T>::min(); }
+        static constexpr T identity() { return 0; }
     private:
         Max() = delete;
         ~Max() = delete;
@@ -92,7 +92,7 @@ namespace TreeReduce {
         static T Apply(T0 &&a, T1 &&b) {
             #pragma HLS INLINE
             const T res = a + b;
-            HLSLIB_OPERATOR_ADD_RESOURCE_PRAGMA(res);
+            // HLSLIB_OPERATOR_ADD_RESOURCE_PRAGMA(res);
             return res;
         }
         static constexpr T identity() { return 0; }
