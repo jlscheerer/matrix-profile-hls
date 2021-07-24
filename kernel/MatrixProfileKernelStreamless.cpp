@@ -77,7 +77,7 @@ void MatrixProfileKernelTLF(const data_t *T, data_t *MP, index_t *MPI) {
 
 	// recompute means to break dependency
 	// and therefore achieve lower II
-        const data_t prev_mean = TreeReduce::Add<double, m>(T_m) / m;
+        const data_t prev_mean = TreeReduce::Add<data_t, m>(T_m) / m;
         const data_t mean = prev_mean + (T_i - T_r) / m;
 
         // calculate df: (T[i+m-1] - T[i-1]) / 2
