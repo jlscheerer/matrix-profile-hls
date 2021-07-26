@@ -6,6 +6,8 @@
 
 #pragma once
 
+// Structure containing all values required for Update
+// Computation and Conversion to PearsonCorrelation
 struct DataPack { 
     data_t df, dg, inv;
     DataPack() = default;
@@ -17,9 +19,10 @@ struct DataPack {
 
 struct ComputePack {
     DataPack row;
-    aggregate_t aggregate;
-    data_t QTforward;
+    aggregate_t rowAggregate;
+    DataPack column;
+    aggregate_t columnAggregate;
     ComputePack() = default;
-    ComputePack(DataPack row, aggregate_t aggregate, data_t QTforward)
-        : row(row), aggregate(aggregate), QTforward(QTforward) {}
+    ComputePack(DataPack row, aggregate_t rowAggregate, DataPack column, aggregate_t columnAggregate)
+        : row(row), rowAggregate(rowAggregate), column(column), columnAggregate(columnAggregate) {}
 };

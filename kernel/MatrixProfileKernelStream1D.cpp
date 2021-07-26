@@ -32,8 +32,8 @@ void MemoryToStream(const InputDataPack *in,
     for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
         const InputDataPack read = in[i];
-        const DataPack readCompute(read.df, read.dg, read.inv);
-        compute.write({readCompute, aggregate_t_init, 0});
+        const DataPack row(read.df, read.dg, read.inv);
+        compute.write({row, aggregate_t_init, DataPack(), aggregate_t_init});
     }
 
 }
@@ -41,24 +41,25 @@ void MemoryToStream(const InputDataPack *in,
 void ProcessingElement(const int stage, 
                        stream<InputDataPack, stream_d> &scatter_in,
                        stream<ComputePack, stream_d> &compute_in,
-                       stream<aggregate_t, stream_d> &reduce_in,
                        stream<InputDataPack, stream_d> &scatter_out,
-                       stream<ComputePack, stream_d> &compute_out,
-                       stream<aggregate_t, stream_d> &reduce_out) {
-    DataPack column[t];
-    aggregate_t columnAggregate[t];
+                       stream<ComputePack, stream_d> &compute_out) {
+    const index_t revStage = (n - m) / t - stage;
+
+    DataPack columns[t];
+    aggregate_t columnAggregates[t];
     data_t QT[t];
 
-    const index_t columnBounds = n - m + 1 - t * stage;
+    const int afterMe = t * revStage;
+	const int myCount = (stage == 0) ? (n - m + 1 - revStage * t) : t;
+	const int loopCount = afterMe + myCount;
 
     MatrixProfileScatter:
-    for (index_t i = 0; i < n - m + 1 - t * stage; ++i) {
+    for (index_t i = 0; i < loopCount; ++i) {
         #pragma HLS PIPELINE II=1
-        const InputDataPack read = scatter_in.read();
-        const DataPack compute(read.df, read.dg, read.inv);
-        if (i < t) {
-            QT[i] = read.QT;
-            column[i] = compute;
+        InputDataPack read = scatter_in.read();
+        if (i >= afterMe) {
+            QT[i - afterMe] = read.QT;
+            columns[i - afterMe] = {read.df, read.dg, read.inv};
         } else scatter_out.write(read);
     }
 
@@ -79,69 +80,68 @@ void ProcessingElement(const int stage,
         const ComputePack read = compute_in.read();
 
         const DataPack row = read.row;
-        const data_t QTbackward = read.QTforward;
-        aggregate_t aggregateBackward = read.aggregate;
+        const aggregate_t rowAggregateBackward = read.rowAggregate;
+
+        const DataPack columnBackward = read.column;
+        const aggregate_t columnAggregateBackward = read.columnAggregate;
 
         MatrixProfileTile:
         for (index_t j = 0; j < t; ++j) {
-            const DataPack col = (j < columnBounds) 
-                ? column[j] : DataPack(0);
-            
-            QT[j] += row.df * col.dg + col.df * row.dg;
-            const bool inBounds = i <= stage * t + j - (m / 4);
-
-            const data_t P = inBounds ? QT[j] * row.inv * col.inv : 0;
-
-            const aggregate_t prevColumn = (i > 0) ? columnAggregate[j] : aggregate_t_init;
-            columnAggregate[j] = (P > prevColumn.value) ? aggregate_t{P, i} : prevColumn;
-
-            aggregate_t prevRow = (j < 16) ? aggregateBackward : rowReduce[i % 8][j % 16];
-	        rowReduce[i % 8][j % 16] = P > prevRow.value ? aggregate_t(P, stage * t + j) : prevRow;
-	    }
-
-	    aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, 16>(rowReduce[i % 8]);
-
-        // shift values in QT forward
-        data_t QTforward = QT[t - 1];
-        MatrixProfileShiftQT:
-        for (index_t j = t - 1; j > 0; --j) {
             #pragma HLS PIPELINE II=1
-            QT[j] = QT[j - 1];
+            
+            const DataPack column = columns[j];
+
+            QT[j] += row.df * column.dg + column.df * row.dg;
+            
+            const index_t rowIndex = i;
+            const index_t columnIndex = afterMe + i + j;
+
+            const bool columnInBounds = columnIndex < n - m + 1;
+            const bool exclusionZone = rowIndex > columnIndex - m / 4;
+            const bool inBounds = columnInBounds && !exclusionZone;
+
+            const data_t P = inBounds ? QT[j] * row.inv * column.inv : 0;
+
+            aggregate_t prevRow = (j < 16) ? rowAggregateBackward : rowReduce[i % 8][j % 16];
+	        rowReduce[i % 8][j % 16] = prevRow.value > P ? prevRow : aggregate_t(P, columnIndex);
+
+            const aggregate_t prevColumn = (i > 0) ? columnAggregates[j] : aggregate_t_init;
+            columnAggregates[j] = (prevColumn.value > P) ? prevColumn : aggregate_t(P, rowIndex);
         }
-        QT[0] = QTbackward;
 
-        compute_out.write({row, rowAggregate, QTforward});
-    }
-    
-    const int loopCount = t * (stage + 1) > (n - m + 1) ? (n - m + 1): (t * (stage + 1));
-    MatrixProfileReduce:
-    for (index_t i = 0; i < loopCount; ++i) {
-        #pragma HLS PIPELINE II=1
-        aggregate_t read = (i >= t * stage) 
-                ? columnAggregate[i - t * stage] : reduce_in.read();
-        reduce_out.write(read);
-    }
+	    const aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, 16>(rowReduce[i % 8]);
 
+        const DataPack columnForward = columns[0];
+        const aggregate_t columnAggregateForward = columnAggregates[0];
+        
+        // shift the current column to the right (i.e. backwards)
+        MatrixProfileShift:
+        for (index_t j = 0; j < t - 1; ++j) {
+            #pragma HLS PIPELINE II=1
+            columns[j] = columns[j + 1];
+            columnAggregates[j] = columnAggregates[j + 1];
+        }
+        columns[t - 1] = columnBackward;
+        columnAggregates[t - 1] = columnAggregateBackward;
+
+        // Propagate Values along the pipeline
+        compute_out.write({row, rowAggregate, columnForward, columnAggregateForward});
+    }
 }
 
-void StreamToMemory(stream<ComputePack, stream_d> &compute, 
-                    stream<aggregate_t, stream_d> &reduce,
+void StreamToMemory(stream<ComputePack, stream_d> &compute,
                     data_t *MP, index_t *MPI) {
-    aggregate_t rowAggregates[n - m + 1];
-
-    StreamToMemoryReduceRow:
+    StreamToMemoryReduce:
     for (index_t i = 0; i < n - m + 1; ++i) {
         #pragma HLS PIPELINE II=1
         const ComputePack read = compute.read();
-        rowAggregates[i] = read.aggregate;
-    }
 
-    StreamToMemoryReduce:
-    for (int i = 0; i < n - m + 1; ++i) {
-        #pragma HLS PIPELINE II=1
-        const aggregate_t rowAggregate = rowAggregates[i];
-        const aggregate_t columnAggregate = reduce.read();
-        const aggregate_t aggregate = rowAggregate.value > columnAggregate.value ? rowAggregate : columnAggregate;
+        const aggregate_t rowAggregate = read.rowAggregate;
+        const aggregate_t columnAggregate = read.columnAggregate;
+        
+        const aggregate_t aggregate = rowAggregate.value > columnAggregate.value 
+						? rowAggregate : columnAggregate;
+        
         MP[i] = aggregate.value;
         MPI[i] = aggregate.index;
     }
@@ -159,15 +159,14 @@ void MatrixProfileKernelTLF(const InputDataPack *in,
 
     stream<InputDataPack, stream_d> scatter[nPE + 1];
     stream<ComputePack, stream_d> compute[nPE + 1];
-    stream<aggregate_t, stream_d> reduce[nPE + 1];
 
     MemoryToStream(in, scatter[0], compute[0]);
 
     for (index_t i = 0; i < nPE; ++i) {
         #pragma HLS UNROLL
-        ProcessingElement(i, scatter[i], compute[i], reduce[i],
-                          scatter[i + 1], compute[i + 1], reduce[i + 1]);
+        ProcessingElement(i, scatter[i], compute[i], 
+                             scatter[i + 1], compute[i + 1]);
     }
 
-    StreamToMemory(compute[nPE], reduce[nPE], MP, MPI);
+    StreamToMemory(compute[nPE], MP, MPI);
 }

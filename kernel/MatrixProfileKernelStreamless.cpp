@@ -8,14 +8,12 @@
     #include "Config.hpp"
     
     #include "kernel/MatrixProfileKernel.hpp"
-    #include "kernel/TreeReduce.hpp"
     
     #include "hls_math.h"
 #endif
 
-// Structure containing all values required for Update
-// Computation and Conversion to PearsonCorrelation
-struct ComputePack { data_t df, dg, inv; };
+#include "kernel/DataPacks.hpp"
+#include "kernel/TreeReduce.hpp"
 
 void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
     #pragma HLS INTERFACE m_axi port=in  offset=slave bundle=gmem0
@@ -23,7 +21,7 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
     #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem1
 
     data_t QT[n - m + 1];
-    ComputePack columnData[n - m + 1], rowData[n - m + 1];
+    DataPack columnData[n - m + 1], rowData[n - m + 1];
     
     // Store computed row aggregates to merge with column 
     // aggregates during the final reduction stage
@@ -33,7 +31,7 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
     for (index_t i = 0; i < n - m + 1; ++i) {
        	#pragma HLS PIPELINE II=1
         const InputDataPack read = in[i];
-        const ComputePack compute = ComputePack{read.df, read.dg, read.inv};
+        const DataPack data = DataPack{read.df, read.dg, read.inv};
 
         // Store read QT value in seperate arary will be updated
         // during the actual computation
@@ -41,8 +39,8 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
 
         // explicitely store two copies of the input data to
         // later access both independently in a single cycle 
-        rowData[i] = compute;
-        columnData[i] = compute;
+        rowData[i] = data;
+        columnData[i] = data;
     }
 
     // TODO: Comment Breaking Dependency by Introducing "Delay-Buffer"
@@ -72,9 +70,9 @@ void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) {
             const bool computationInRange = k + i < n - m + 1;
             const bool exclusionZone = i < (m / 4);
 
-            const ComputePack row = rowData[k];
-            const ComputePack column = (!exclusionZone && computationInRange)
-                                            ? columnData[columnIndex] : (ComputePack){0, 0, 0};
+            const DataPack row = rowData[k];
+            const DataPack column = (!exclusionZone && computationInRange)
+                                            ? columnData[columnIndex] : (DataPack){0, 0, 0};
 
 	        // Update QT value diagonally above via the update formulation
             // QT_{i, j} = QT_{i-1, j-1} + df_i * dg_j + df_j * dg_i
