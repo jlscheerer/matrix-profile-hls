@@ -9,49 +9,67 @@
     #include "kernel/MatrixProfileKernel.hpp"
     
     #include "hls_math.h"
-    #include "hls_stream.h"
-    using hls::stream;
 #endif
 
-#include "kernel/DataPacks.hpp"
+#include "kernel/Stream.hpp"
 #include "kernel/TreeReduce.hpp"
+#include "kernel/DataPacks.hpp"
 
-static constexpr size_t stream_d = 3;
-
-void MemoryToStream(const InputDataPack *in, 
-                    stream<InputDataPack, stream_d> &scatter,
-                    stream<ComputePack, stream_d> &compute) {
+void MemoryToStream(const index_t n, const index_t m, const index_t iteration, 
+                    const InputDataPack *columns, const InputDataPack *rows,
+                    Stream<InputDataPack> &scatter, Stream<ComputePack> &compute) {
+    const index_t nOffset = iteration * nColumns;
+    const index_t nRows = n - m + 1 - nOffset;
+    
     MemoryToStreamScatter:
-    for (index_t i = 0; i < n - m + 1; ++i) {
+    for (index_t i = 0; i < nColumns; ++i) {
         #pragma HLS PIPELINE II=1
-        const InputDataPack read = in[i];
+        const index_t columnIndex = nOffset + i;
+        const InputDataPack read = (columnIndex < n - m + 1) ? columns[columnIndex]
+                                                             : InputDataPack(0);
         scatter.write(read);
     }
     
     MemoryToStreamCompute:
-    for (index_t i = 0; i < n - m + 1; ++i) {
+    for (index_t i = 0; i < nRows; ++i) {
         #pragma HLS PIPELINE II=1
-        const InputDataPack read = in[i];
-        const DataPack row(read.df, read.dg, read.inv);
-        compute.write({row, aggregate_t_init, DataPack(), aggregate_t_init});
+
+        // rows will by design always by in bounds!
+        const InputDataPack readRow = rows[i];
+        const DataPack rowData(readRow.df, readRow.dg, readRow.inv);
+        const aggregate_t rowAggregate = aggregate_t_init;
+
+        const index_t columnIndex = nOffset + nColumns + i;
+        const bool inBounds = columnIndex < n - m + 1;
+
+        const InputDataPack readColumn = inBounds ? columns[columnIndex] 
+                                                  : InputDataPack(0);
+        const DataPack columnData(readColumn.df, readColumn.dg, readColumn.inv);
+        const aggregate_t columnAggregate = aggregate_t_init;
+
+        compute.write({rowData, rowAggregate, columnData, columnAggregate});
     }
 
 }
 
-void ProcessingElement(const int stage, 
-                       stream<InputDataPack, stream_d> &scatter_in,
-                       stream<ComputePack, stream_d> &compute_in,
-                       stream<InputDataPack, stream_d> &scatter_out,
-                       stream<ComputePack, stream_d> &compute_out) {
-    const index_t revStage = (n - m) / t - stage;
+void ProcessingElement(const index_t n, const index_t m,
+                       const index_t iteration, const index_t stage, 
+                       Stream<InputDataPack> &scatter_in,
+                       Stream<ComputePack> &compute_in,
+                       Stream<InputDataPack> &scatter_out,
+                       Stream<ComputePack> &compute_out) {
+    const index_t nOffset = iteration * nColumns;
+    const index_t nRows = n - m + 1 - nOffset;
+
+    const index_t revStage = (nColumns - 1) / t - stage;
 
     DataPack columns[t];
     aggregate_t columnAggregates[t];
     data_t QT[t];
 
-    const int afterMe = t * revStage;
-	const int myCount = (stage == 0) ? (n - m + 1 - revStage * t) : t;
-	const int loopCount = afterMe + myCount;
+    const index_t afterMe = t * revStage;
+	const index_t myCount = (stage == 0) ? (nColumns - revStage * t) : t;
+	const index_t loopCount = afterMe + myCount;
 
     MatrixProfileScatter:
     for (index_t i = 0; i < loopCount; ++i) {
@@ -76,7 +94,7 @@ void ProcessingElement(const int stage,
     }
 
     MatrixProfileCompute:
-    for (index_t i = 0; i < n - m + 1; ++i) {
+    for (index_t i = 0; i < nRows; ++i) {
         const ComputePack read = compute_in.read();
 
         const DataPack row = read.row;
@@ -94,7 +112,7 @@ void ProcessingElement(const int stage,
             QT[j] += row.df * column.dg + column.df * row.dg;
             
             const index_t rowIndex = i;
-            const index_t columnIndex = afterMe + i + j;
+            const index_t columnIndex = nOffset + afterMe + i + j;
 
             const bool columnInBounds = columnIndex < n - m + 1;
             const bool exclusionZone = rowIndex > columnIndex - m / 4;
@@ -129,44 +147,43 @@ void ProcessingElement(const int stage,
     }
 }
 
-void StreamToMemory(stream<ComputePack, stream_d> &compute,
-                    data_t *MP, index_t *MPI) {
+void StreamToMemory(const index_t n, const index_t m, const index_t iteration,
+                    Stream<ComputePack> &compute, OutputDataPack *result) {
+    const index_t nOffset = iteration * nColumns;
+    const index_t nRows = n - m + 1 - nOffset;
+
     StreamToMemoryReduce:
-    for (index_t i = 0; i < n - m + 1; ++i) {
+    for (index_t i = 0; i < nRows; ++i) {
         #pragma HLS PIPELINE II=1
         const ComputePack read = compute.read();
 
         const aggregate_t rowAggregate = read.rowAggregate;
         const aggregate_t columnAggregate = read.columnAggregate;
         
-        const aggregate_t aggregate = rowAggregate.value > columnAggregate.value 
-						? rowAggregate : columnAggregate;
-        
-        MP[i] = aggregate.value;
-        MPI[i] = aggregate.index;
+        result[i] = {rowAggregate, columnAggregate};
     }
 }
 
-void MatrixProfileKernelTLF(const InputDataPack *in,
-                            data_t *MP, index_t *MPI) {
-    #pragma HLS INTERFACE m_axi port=in  offset=slave bundle=gmem0
-    #pragma HLS INTERFACE m_axi port=MP  offset=slave bundle=gmem0
-    #pragma HLS INTERFACE m_axi port=MPI offset=slave bundle=gmem1
+void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iteration,
+                            const InputDataPack *columns, const InputDataPack *rows, OutputDataPack *result) {
+    #pragma HLS INTERFACE m_axi port=columns offset=slave bundle=gmem0
+    #pragma HLS INTERFACE m_axi port=rows    offset=slave bundle=gmem1
+    #pragma HLS INTERFACE m_axi port=result  offset=slave bundle=gmem2
 
     #pragma HLS DATAFLOW
 
-    constexpr index_t nPE = (n - m + t) / t;
+    constexpr index_t nPE = (nColumns + t - 1) / t;
 
-    stream<InputDataPack, stream_d> scatter[nPE + 1];
-    stream<ComputePack, stream_d> compute[nPE + 1];
+    Stream<InputDataPack> scatter[nPE + 1];
+    Stream<ComputePack> compute[nPE + 1];
 
-    MemoryToStream(in, scatter[0], compute[0]);
+    MemoryToStream(n, m, iteration, columns, rows, scatter[0], compute[0]);
 
     for (index_t i = 0; i < nPE; ++i) {
         #pragma HLS UNROLL
-        ProcessingElement(i, scatter[i], compute[i], 
-                             scatter[i + 1], compute[i + 1]);
+        ProcessingElement(n, m, iteration, i, scatter[i], compute[i], 
+                          scatter[i + 1], compute[i + 1]);
     }
 
-    StreamToMemory(compute[nPE], MP, MPI);
+    StreamToMemory(n, m, iteration, compute[nPE], result);
 }

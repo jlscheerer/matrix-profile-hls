@@ -141,7 +141,17 @@ namespace OpenCL{
                 cl_int errorCode = m_context->commandQueue().enqueueReadBuffer(m_buffer, CL_TRUE, 0, m_size * sizeof(T), &(*target));
 
                 if(errorCode != CL_SUCCESS)
-                    throw RuntimeError("Failed top copy data from device.");
+                    throw RuntimeError("Failed to copy data from device.");
+            }
+
+            template<typename IteratorType, typename = typename
+                     std::enable_if<IsIteratorOfType<IteratorType, T>() && IsRandomAccess<IteratorType>()>::type>
+            void CopyToHost(IteratorType target, size_t size) {
+                // Data can be transferred back to the host using the read buffer operation
+                cl_int errorCode = m_context->commandQueue().enqueueReadBuffer(m_buffer, CL_TRUE, 0, size * sizeof(T), &(*target));
+
+                if(errorCode != CL_SUCCESS)
+                    throw RuntimeError("Failed to copy data from device.");
             }
 
             // Returns the internal OpenCL context

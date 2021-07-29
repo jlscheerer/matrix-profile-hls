@@ -38,9 +38,10 @@ set(VALID_INDEX_TYPES int)
 set(MP_INDEX_TYPE "int" CACHE STRING "type for the resulting matrix profile index")
 set_property(CACHE MP_INDEX_TYPE PROPERTY STRINGS ${VALID_INDEX_TYPES})
 
-set(MP_SIZE_N 8 CACHE STRING "length of the time series data")
-set(MP_SIZE_M 4 CACHE STRING "subsequence length for the matrix profile")
-set(MP_SIZE_T 4 CACHE STRING "tile-size (only applicable for Stream1D) [assumption: t ≥ m]")
+set(MP_SIZE_N 8192 CACHE STRING "length of the time series data")
+set(MP_SIZE_M 32 CACHE STRING "subsequence length for the matrix profile")
+set(MP_SIZE_W 1024 CACHE STRING "number of diagonals to compute in a single iteration on device")
+set(MP_SIZE_T 128 CACHE STRING "tile-size (only applicable for Stream1D) [assumption: t ≥ m]")
 
 # Custom option to enable software testing using google-test
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
@@ -71,6 +72,10 @@ endif()
 
 if(NOT(${MP_SIZE_N} MATCHES "^[0-9]+$"))
     message(FATAL_ERROR "The specified value for 'MP_SIZE_N' [\"${MP_SIZE_N}\"] is invalid, n has to be numeric!")
+endif()
+
+if(NOT(${MP_SIZE_W} MATCHES "^[0-9]+$") OR ${MP_SIZE_N} LESS ${MP_SIZE_W})
+    message(FATAL_ERROR "The specified value for 'MP_SIZE_W' [\"${MP_SIZE_W}\"] is invalid, w has to be numeric and ≤ n!")
 endif()
 
 if(NOT(${MP_SIZE_M} MATCHES "^[0-9]+$") OR ${MP_SIZE_N} LESS ${MP_SIZE_M})
@@ -160,12 +165,12 @@ else()
 endif()
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o
-                   COMMENT "Compiling Host Application (n = ${MP_SIZE_N}, m = ${MP_SIZE_M})"
+                   COMMENT "Compiling Host Application (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, w = ${MP_SIZE_W})"
                    COMMAND ${HOST_COMPILER} ${HOST_COMPILE_COMMAND} -o "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o" "${CMAKE_CURRENT_SOURCE_DIR}/host/MatrixProfileHost.cpp"
                    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/host/MatrixProfileHost.cpp")
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost
-                   COMMENT "Linking Host Application"
+                   COMMENT "Linking Host Application (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, w = ${MP_SIZE_W})"
                    COMMAND ${HOST_COMPILER} -o "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o" ${HOST_LINK_COMMAND}
                    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileHost.o")
 
@@ -187,7 +192,7 @@ set(KERNEL_COMPILE_COMMAND
     -I"${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo
-                   COMMENT "Compiling ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
+                   COMMENT "Compiling ${MP_KERNEL}-Kernel (w = ${MP_SIZE_W}, [t = ${MP_SIZE_T}], target = ${MP_TARGET})"
                    COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_COMPILE_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo" "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp"
                    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/kernel/MatrixProfileKernel${MP_KERNEL}.cpp"
                            "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
@@ -207,7 +212,7 @@ endif()
 
 if(("${MP_TARGET}" STREQUAL "hw_emu") OR ("${MP_TARGET}" STREQUAL "hw"))
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
-                    COMMENT "Linking ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
+                    COMMENT "Linking ${MP_KERNEL}-Kernel (w = ${MP_SIZE_W}, [t = ${MP_SIZE_T}], target = ${MP_TARGET})"
                     COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
                     POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.build/reports/MatrixProfileKernelTLF/hls_reports/MatrixProfileKernelTLF_csynth.rpt ${CMAKE_CURRENT_BINARY_DIR}/reports/csynth.rpt
                     POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.build/MatrixProfileKernelTLF/MatrixProfileKernelTLF/vitis_hls.log ${CMAKE_CURRENT_BINARY_DIR}/reports/vitis_hls.log
@@ -217,7 +222,7 @@ if(("${MP_TARGET}" STREQUAL "hw_emu") OR ("${MP_TARGET}" STREQUAL "hw"))
                             "${CMAKE_CURRENT_BINARY_DIR}/config/link-config.cfg")
 else()
     add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin"
-                    COMMENT "Linking ${MP_KERNEL}-Kernel (n = ${MP_SIZE_N}, m = ${MP_SIZE_M}, target = ${MP_TARGET})"
+                    COMMENT "Linking ${MP_KERNEL}-Kernel (w = ${MP_SIZE_W}, [t = ${MP_SIZE_T}], target = ${MP_TARGET})"
                     COMMAND ${CMAKE_COMMAND} -E env "XCL_EMULATION_MODE=${MP_TARGET}" "LIBRARY_PATH=${MP_LIBRARY_PATH}" ${VITIS_COMPILER} --target ${MP_TARGET} ${KERNEL_LINK_COMMAND} ${OPTIMIZATION_PARAMETER} -o"${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernel.xclbin" "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
                     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/MatrixProfileKernelTLF.xo"
                             "${CMAKE_CURRENT_BINARY_DIR}/config/common-config.cfg"
@@ -276,3 +281,4 @@ if(BUILD_TESTS)
     add_test(NAME TestStreamlessKernel COMMAND testStreamlessKernel)
     add_test(NAME TestStream1DKernel COMMAND testStream1DKernel)
 endif()
+
