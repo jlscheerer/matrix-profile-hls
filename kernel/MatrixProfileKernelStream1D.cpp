@@ -68,8 +68,8 @@ void ProcessingElement(const index_t n, const index_t m,
     data_t QT[t];
 
     const index_t afterMe = t * revStage;
-	const index_t myCount = (stage == 0) ? (nColumns - revStage * t) : t;
-	const index_t loopCount = afterMe + myCount;
+    const index_t myCount = (stage == 0) ? (nColumns - revStage * t) : t;
+    const index_t loopCount = afterMe + myCount;
 
     MatrixProfileScatter:
     for (index_t i = 0; i < loopCount; ++i) {
@@ -81,17 +81,21 @@ void ProcessingElement(const index_t n, const index_t m,
         } else scatter_out.write(read);
     }
 
-    aggregate_t rowReduce[8][16];
+    constexpr int rowReduceD1 = 8;
+    constexpr int rowReduceD2 = 8;
+    aggregate_t rowReduce[rowReduceD1][rowReduceD2];
     #pragma HLS ARRAY_PARTITION variable=rowReduce dim=2 complete
 
-    // TODO: Only required for t <= 16
+#if 0
+    // TODO: Only required for t <= rowReduceD2
     MatrixProfileInitReduce:
-    for (index_t i = 0; i < 8; ++i) {
-        for (index_t j = 0; j < 16; ++j) {
+    for (index_t i = 0; i < rowReduceD1; ++i) {
+        for (index_t j = 0; j < rowReduceD2; ++j) {
             #pragma HLS UNROLL
             rowReduce[i][j] = aggregate_t_init;
         }
     }
+#endif
 
     MatrixProfileCompute:
     for (index_t i = 0; i < nRows; ++i) {
@@ -120,14 +124,14 @@ void ProcessingElement(const index_t n, const index_t m,
 
             const data_t P = inBounds ? QT[j] * row.inv * column.inv : 0;
 
-            aggregate_t prevRow = (j < 16) ? rowAggregateBackward : rowReduce[i % 8][j % 16];
-	        rowReduce[i % 8][j % 16] = prevRow.value > P ? prevRow : aggregate_t(P, columnIndex);
+            aggregate_t prevRow = (j < rowReduceD2) ? rowAggregateBackward : rowReduce[i % rowReduceD1][j % rowReduceD2];
+	    rowReduce[i % rowReduceD1][j % rowReduceD2] = prevRow.value > P ? prevRow : aggregate_t(P, columnIndex);
 
             const aggregate_t prevColumn = (i > 0) ? columnAggregates[j] : aggregate_t_init;
             columnAggregates[j] = (prevColumn.value > P) ? prevColumn : aggregate_t(P, rowIndex);
         }
 
-	    const aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, 16>(rowReduce[i % 8]);
+	const aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, rowReduceD2>(rowReduce[i % rowReduceD1]);
 
         const DataPack columnForward = columns[0];
         const aggregate_t columnAggregateForward = columnAggregates[0];
