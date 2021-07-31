@@ -5,67 +5,50 @@
  */
 
 #include "MatrixProfileTests.hpp"
-#include "MockInitialize.hpp"
 
 namespace MatrixProfileTests {
 
     // wrapper struct to have multiple Stream1DKernel instances
-    // with different confugrations (data_t, index_t, n, m)
-    // this allows for multiple test (without having to recompile)
-    template<typename data_t, typename index_t, int n, int m, int t>
-    struct Stream1DKernel: public MatrixProfileKernel<data_t, index_t, n, m> {
-        // "negative infinity" used to initialize aggregates
-        static constexpr data_t aggregate_init = AggregateInit<data_t>();
+    // with different configurations (data_t, index_t, w) this allows
+    // for multiple test (without having to recompile)
+    template<typename data_t, typename index_t, int w, int t>
+    struct Stream1DKernel: public MatrixProfileKernel<data_t, index_t, w> {
+        
+        using aggregate_t = typename MatrixProfileKernel<data_t, index_t, w>::aggregate_t;
+        using InputDataPack = typename MatrixProfileKernel<data_t, index_t, w>::InputDataPack;
+        using OutputDataPack = typename MatrixProfileKernel<data_t, index_t, w>::OutputDataPack;
 
-        // used to indicate an invalid/undetermined index
-        static constexpr index_t index_init = IndexInit<index_t>();
+        static constexpr data_t aggregate_init = MatrixProfileKernel<data_t, index_t, w>::aggregate_init;
+        static constexpr index_t index_init = MatrixProfileKernel<data_t, index_t, w>::index_init;
 
-        struct aggregate_t { 
-            data_t value; index_t index; 
-            aggregate_t() = default;
-            aggregate_t(const data_t value, const index_t index)
-                : value(value), index(index) {}
-            bool operator<(const data_t other) const { return value < other; }
-            bool operator>(const aggregate_t other) const { return value > other.value; }
-        };
+        static constexpr index_t nColumns = MatrixProfileKernel<data_t, index_t, w>::nColumns;
 
-        using InputDataPack = typename MatrixProfileKernel<data_t, index_t, n, m>::InputDataPack;
         #include "MatrixProfileKernelStream1D.cpp"
     };
 
-    TEST(TestStream1DKernel, TestSmall8SynM4) {
-        Stream1DKernel<double, int, 8, 4, 4> kernel;
-        TestMatrixProfileKernel(kernel, "synthetic/small8_syn.txt");
+    TEST(TestStream1DKernel, TestSmall128SynM16) {
+        Stream1DKernel<double, int, 32, 16> kernel;
+        TestMatrixProfileKernel<double, int, 128, 16, 32>(kernel, "synthetic/small128_syn.txt");
     }
 
-    TEST(TestStream1DKernel, TestSmall16SynM4) {
-        Stream1DKernel<double, int, 16, 4, 8> kernel;
-        TestMatrixProfileKernel(kernel, "synthetic/small16_syn.txt");
+    TEST(TestStream1DKernel, TestBenchmark1024SynM16W32T16) {
+        Stream1DKernel<double, int, 32, 16> kernel;
+        TestMatrixProfileKernel<double, int, 1024, 16, 32>(kernel, "benchmark/1024.txt");
     }
 
-    TEST(TestStream1DKernel, TestSmall128SynM4) {
-        Stream1DKernel<double, int, 128, 4, 12> kernel;
-        TestMatrixProfileKernel(kernel, "synthetic/small128_syn.txt");
+    TEST(TestStream1DKernel, TestBenchmark1024SynM16W256T128) {
+        Stream1DKernel<double, int, 256, 128> kernel;
+        TestMatrixProfileKernel<double, int, 1024, 16, 256>(kernel, "benchmark/1024.txt");
     }
 
-    TEST(TestStream1DKernel, TestBenchmark1024SynM4T20) {
-        Stream1DKernel<double, int, 1024, 4, 20> kernel;
-        TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
+    TEST(TestStream1DKernel, TestBenchmark1024SynM32W256T128) {
+        Stream1DKernel<double, int, 512, 128> kernel;
+        TestMatrixProfileKernel<double, int, 1024, 32, 512>(kernel, "benchmark/1024.txt");
     }
 
-    TEST(TestStream1DKernel, TestBenchmark1024SynM4T100) {
-        Stream1DKernel<double, int, 1024, 4, 100> kernel;
-        TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
-    }
-
-    TEST(TestStream1DKernel, TestBenchmark1024SynM20T500) {
-        Stream1DKernel<double, int, 1024, 20, 500> kernel;
-        TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
-    }
-
-    TEST(TestStream1DKernel, TestBenchmark1024SynM20T1000) {
-        Stream1DKernel<double, int, 1024, 20, 1000> kernel;
-        TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
+    TEST(TestStream1DKernel, TestBenchmark16384SynM128W1024T128) {
+        Stream1DKernel<double, int, 1024, 128> kernel;
+        TestMatrixProfileKernel<double, int, 16384, 128, 1024>(kernel, "benchmark/16384.txt");
     }
 
 }

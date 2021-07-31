@@ -5,58 +5,40 @@
  */
 
 #include "MatrixProfileTests.hpp"
-#include "MockInitialize.hpp"
 
 namespace MatrixProfileTests {
 
     // wrapper struct to have multiple StreamlessKernel instances
-    // with different confugrations (data_t, index_t, n, m)
-    // this allows for multiple test (without having to recompile)
-    template<typename data_t, typename index_t, int n, int m>
-    struct StreamlessKernel: public MatrixProfileKernel<data_t, index_t, n, m> {
-        // "negative infinity" used to initialize aggregates
-        static constexpr data_t aggregate_init = AggregateInit<data_t>();
+    // with different configurations (data_t, index_t, w) this allows
+    // for multiple test (without having to recompile)
+    template<typename data_t, typename index_t, int w>
+    struct StreamlessKernel: public MatrixProfileKernel<data_t, index_t, w> {
 
-        // used to indicate an invalid/undetermined index
-        static constexpr index_t index_init = IndexInit<index_t>();
+        using aggregate_t = typename MatrixProfileKernel<data_t, index_t, w>::aggregate_t;
+        using InputDataPack = typename MatrixProfileKernel<data_t, index_t, w>::InputDataPack;
+        using OutputDataPack = typename MatrixProfileKernel<data_t, index_t, w>::OutputDataPack;
 
-        struct aggregate_t { 
-            data_t value; index_t index; 
-            aggregate_t() = default;
-            aggregate_t(const data_t value, const index_t index)
-                : value(value), index(index) {}
-            bool operator<(const data_t other) const { return value < other; }
-            bool operator>(const aggregate_t other) const { return value > other.value; }
-        };
+        static constexpr data_t aggregate_init = MatrixProfileKernel<data_t, index_t, w>::aggregate_init;
+        static constexpr index_t index_init = MatrixProfileKernel<data_t, index_t, w>::index_init;
 
-        using InputDataPack = typename MatrixProfileKernel<data_t, index_t, n, m>::InputDataPack;
+        static constexpr index_t nColumns = MatrixProfileKernel<data_t, index_t, w>::nColumns;
+
         #include "MatrixProfileKernelStreamless.cpp"
     };
-
-    TEST(TestStreamlessKernel, TestSmall8SynM4) {
-        StreamlessKernel<double, int, 8, 4> kernel;
-        TestMatrixProfileKernel(kernel, "synthetic/small8_syn.txt");
+    
+    TEST(TestStreamlessKernel, TestSmall128SynM16W32) {
+        StreamlessKernel<double, int, 32> kernel;
+        TestMatrixProfileKernel<double, int, 128, 16, 32>(kernel, "synthetic/small128_syn.txt");
     }
 
-    
-    TEST(TestStreamlessKernel, TestSmall16SynM4) {
-        StreamlessKernel<double, int, 16, 4> kernel;
-        TestMatrixProfileKernel(kernel, "synthetic/small16_syn.txt");
+    TEST(TestStreamlessKernel, TestBenchmark1024SynM16W32) {
+        StreamlessKernel<double, int, 32> kernel;
+        TestMatrixProfileKernel<double, int, 1024, 16, 32>(kernel, "benchmark/1024.txt");
     }
     
-    TEST(TestStreamlessKernel, TestSmall128SynM4) {
-        StreamlessKernel<double, int, 128, 4> kernel;
-        TestMatrixProfileKernel(kernel, "synthetic/small128_syn.txt");
-    }
-    
-    TEST(TestStreamlessKernel, TestBenchmark1024SynM4) {
-        StreamlessKernel<double, int, 1024, 4> kernel;
-        TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
-    }
-    
-    TEST(TestStreamlessKernel, TestBenchmark1024SynM20) {
-        StreamlessKernel<double, int, 1024, 20> kernel;
-        TestMatrixProfileKernel(kernel, "benchmark/1024.txt");
+    TEST(TestStream1DKernel, TestBenchmark16384SynM128W1024) {
+        StreamlessKernel<double, int, 1024> kernel;
+        TestMatrixProfileKernel<double, int, 16384, 128, 1024>(kernel, "benchmark/16384.txt");
     }
 
 }

@@ -17,22 +17,54 @@
 #include <numeric>
 
 #define TEST_MOCK_SW
+#include "kernel/TreeReduce.hpp"
 #include "MockStream.hpp"
+#include "MockInitialize.hpp"
 using Mock::stream;
 
-#include "kernel/TreeReduce.hpp"
-
 #include "MatrixProfileReference.hpp"
+
 
 #define aggregate_t_init (aggregate_t){aggregate_init, index_init}
 #define sublen (n - m + 1)
 
 namespace MatrixProfileTests {
 
-    template<typename data_t, typename index_t, size_t n, size_t m>
+    template<typename data_t, typename index_t, int w>
     struct MatrixProfileKernel {
-        struct InputDataPack { data_t QT, df, dg, inv; };
-        virtual void MatrixProfileKernelTLF(const InputDataPack *in, data_t *MP, index_t *MPI) = 0;
+
+        // "negative infinity" used to initialize aggregates
+        static constexpr data_t aggregate_init = AggregateInit<data_t>();
+
+        // used to indicate an invalid/undetermined index
+        static constexpr index_t index_init = IndexInit<index_t>();
+
+        struct aggregate_t { 
+            data_t value; index_t index; 
+            aggregate_t() = default;
+            aggregate_t(const data_t value, const index_t index)
+                : value(value), index(index) {}
+            bool operator<(const data_t other) const { return value < other; }
+            bool operator>(const aggregate_t other) const { return value > other.value; }
+        };
+
+        struct InputDataPack {
+            data_t QT, df, dg, inv;
+            InputDataPack() = default;
+            InputDataPack(data_t value)
+                : QT(value), df(value), dg(value), inv(value) {}
+        };
+
+        struct OutputDataPack {
+            aggregate_t rowAggregate, columnAggregate;
+            OutputDataPack() = default;
+            OutputDataPack(aggregate_t rowAggregate, aggregate_t columnAggregate)
+                : rowAggregate(rowAggregate), columnAggregate(columnAggregate) {}
+        };
+
+        static constexpr index_t nColumns = w;
+
+        virtual void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iteration, const InputDataPack *columns, const InputDataPack *rows, OutputDataPack *out) = 0;
     };
 
     template<typename data_t>
@@ -77,9 +109,9 @@ namespace MatrixProfileTests {
     }
 
     template<typename data_t, typename index_t, size_t n, size_t m>
-    void PearsonCorrelationToEuclideanDistance(const std::array<data_t, n - m + 1> &PearsonCorrelations, std::array<data_t, n - m + 1> &EuclideanDistance) {
+    void PearsonCorrelationToEuclideanDistance(std::array<data_t, n - m + 1> &MP) {
         for (index_t i = 0; i < n - m + 1; ++i)
-            EuclideanDistance[i] = std::sqrt(2 * m * (1 - PearsonCorrelations[i]));
+            MP[i] = std::sqrt(2 * m * (1 - MP[i]));
     }
 
     template<typename data_t, typename index_t, size_t n, size_t m, typename InputDataPack>
@@ -106,21 +138,63 @@ namespace MatrixProfileTests {
         }
     }
 
-    template<typename data_t, typename index_t, size_t n, size_t m>
-    void TestMatrixProfileKernel(MatrixProfileKernel<data_t, index_t, n, m> &kernel, const std::array<data_t, n> &T, 
+    template<typename data_t, typename index_t, size_t n, size_t m, int w>
+    void TestMatrixProfileKernel(MatrixProfileKernel<data_t, index_t, w> &kernel, const std::array<data_t, n> &T, 
                                 const std::array<data_t, n - m + 1> &MPExpected, const std::array<index_t, n - m + 1> &MPIExpected) {
+        using aggregate_t = typename MatrixProfileKernel<data_t, index_t, w>::aggregate_t;
+        using InputDataPack = typename MatrixProfileKernel<data_t, index_t, w>::InputDataPack;
+        using OutputDataPack = typename MatrixProfileKernel<data_t, index_t, w>::OutputDataPack;
+        
+        constexpr data_t aggregate_init = MatrixProfileKernel<data_t, index_t, w>::aggregate_init;
+        constexpr index_t index_init = MatrixProfileKernel<data_t, index_t, w>::index_init;
+        constexpr index_t nColumns = MatrixProfileKernel<data_t, index_t, w>::nColumns;
+
         Mock::Reset();
-        std::array<data_t, n - m + 1> P, MP;
+
+        std::array<aggregate_t, n - m + 1> rowAggregates, columnAggregates;
+        std::array<InputDataPack, n - m + 1> input;
+        PrecomputeStatistics<data_t, index_t, n, m, InputDataPack>(T, input);
+
+        std::array<OutputDataPack, n - m + 1> output;
+
+        constexpr index_t nIterations = (n - m + nColumns) / nColumns;
+        for (index_t iteration = 0; iteration < nIterations; ++iteration) {
+            const index_t nOffset = iteration * nColumns;
+            const index_t nRows = n - m + 1 - nOffset;
+            
+            kernel.MatrixProfileKernelTLF(n, m, iteration, input.data(), input.data(), output.data());
+
+            // Update Local "Copies" of Aggregates
+            for (index_t i = 0; i < nRows; ++i) {
+                aggregate_t prevRow = iteration > 0 ? rowAggregates[i] : aggregate_t_init;
+                aggregate_t prevCol = iteration > 0 ? columnAggregates[i + nOffset] : aggregate_t_init;
+
+                aggregate_t currRow = output[i].rowAggregate;
+                aggregate_t currCol = output[i].columnAggregate;
+
+                rowAggregates[i] = currRow.value > prevRow.value ? currRow : prevRow;
+                columnAggregates[i + nOffset] = currCol.value > prevCol.value ? currCol : prevCol;
+            }
+        }
+
+        std::array<data_t, n - m + 1> MP;
         std::array<index_t, n - m + 1> MPI;
 
-        using InputDataPack = typename MatrixProfileKernel<data_t, index_t, n, m>::InputDataPack;
+        // merge aggregates at the "very" end
+        for (index_t i = 0; i < n - m + 1; ++i) {
+            aggregate_t rowAggregate = rowAggregates[i];
+            aggregate_t columnAggregate = columnAggregates[i];
+        
+            // merge the aggregates by taking the maximum
+            aggregate_t aggregate = rowAggregate.value > columnAggregate.value ? rowAggregate : columnAggregate;
 
-        std::array<InputDataPack, n - m + 1> data;
-        PrecomputeStatistics<data_t, index_t, n, m, InputDataPack>(T, data);
-        kernel.MatrixProfileKernelTLF(data.data(), P.data(), MPI.data());
+            // directly convert obtained pearson correlation to euclidean distance
+            MP[i] = aggregate.value;
+            MPI[i] = aggregate.index;
+        }
 
         // Convert Pearson Correlation to Euclidean Distance
-        PearsonCorrelationToEuclideanDistance<data_t, index_t, n, m>(P, MP);
+        PearsonCorrelationToEuclideanDistance<data_t, index_t, n, m>(MP);
 
         // check that in fact all streams are empty
         ASSERT_EQ(Mock::all_streams_empty, true);
@@ -138,22 +212,22 @@ namespace MatrixProfileTests {
         }
     }
 
-    template<typename data_t, typename index_t, size_t n, size_t m>
-    void TestMatrixProfileKernel(MatrixProfileKernel<data_t, index_t, n, m> &kernel, const std::array<data_t, n> &T) {
+    template<typename data_t, typename index_t, size_t n, size_t m, int w>
+    void TestMatrixProfileKernel(MatrixProfileKernel<data_t, index_t, w> &kernel, const std::array<data_t, n> &T) {
         std::array<data_t, n - m + 1> MP;
         std::array<index_t, n - m + 1> MPI;
         Reference::ComputeMatrixProfile<data_t, index_t, n, m>(T, MP, MPI);
-        TestMatrixProfileKernel(kernel, T, MP, MPI);
+        TestMatrixProfileKernel<data_t, index_t, n, m, w>(kernel, T, MP, MPI);
     }
 
-    template<typename data_t, typename index_t, size_t n, size_t m>
-    void TestMatrixProfileKernel(MatrixProfileKernel<data_t, index_t, n, m> &kernel, const std::string &inputFile) {
+    template<typename data_t, typename index_t, size_t n, size_t m, int w>
+    void TestMatrixProfileKernel(MatrixProfileKernel<data_t, index_t, w> &kernel, const std::string &inputFile) {
         std::ifstream input("../data/" + inputFile);
         ASSERT_TRUE(input.is_open());
         std::array<data_t, n> T;
         for(size_t i = 0; i < n; ++i)
             input >> T[i];
-        TestMatrixProfileKernel(kernel, T);
+        TestMatrixProfileKernel<data_t, index_t, n, m, w>(kernel, T);
     }
 
 }
