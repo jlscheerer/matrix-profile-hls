@@ -110,11 +110,11 @@ void ProcessingElement(const index_t n, const index_t m,
         MatrixProfileTile:
         for (index_t j = 0; j < t; ++j) {
             #pragma HLS PIPELINE II=1
-            
+
             const DataPack column = columns[j];
 
             QT[j] += row.df * column.dg + column.df * row.dg;
-            
+
             const index_t rowIndex = i;
             const index_t columnIndex = nOffset + afterMe + i + j;
 
@@ -124,14 +124,18 @@ void ProcessingElement(const index_t n, const index_t m,
 
             const data_t P = inBounds ? QT[j] * row.inv * column.inv : 0;
 
-            aggregate_t prevRow = (j < rowReduceD2) ? rowAggregateBackward : rowReduce[i % rowReduceD1][j % rowReduceD2];
-	    rowReduce[i % rowReduceD1][j % rowReduceD2] = prevRow.value > P ? prevRow : aggregate_t(P, columnIndex);
+            const aggregate_t prevRow = (j < rowReduceD2) ? rowAggregateBackward 
+                                                          : rowReduce[i % rowReduceD1][j % rowReduceD2];
+            rowReduce[i % rowReduceD1][j % rowReduceD2] = prevRow.value > P ? prevRow 
+                                                                            : aggregate_t(P, columnIndex);
 
-            const aggregate_t prevColumn = (i > 0) ? columnAggregates[j] : aggregate_t_init;
-            columnAggregates[j] = (prevColumn.value > P) ? prevColumn : aggregate_t(P, rowIndex);
+            const aggregate_t prevColumn = (i > 0) ? columnAggregates[j] 
+                                                   : aggregate_t_init;
+            columnAggregates[j] = (prevColumn.value > P) ? prevColumn 
+                                                         : aggregate_t(P, rowIndex);
         }
 
-	const aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, rowReduceD2>(rowReduce[i % rowReduceD1]);
+        const aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, rowReduceD2>(rowReduce[i % rowReduceD1]);
 
         const DataPack columnForward = columns[0];
         const aggregate_t columnAggregateForward = columnAggregates[0];
