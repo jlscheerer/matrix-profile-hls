@@ -75,7 +75,8 @@ void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iter
             const data_t P = inBounds ? QT[j] * row.inv * column.inv : 0;
 
             aggregate_t prevRow = (j < rowReduceD2) ? aggregate_t_init : rowReduce[i % rowReduceD1][j % rowReduceD2];
-	        rowReduce[i % rowReduceD1][j % rowReduceD2] = prevRow.value > P ? prevRow : aggregate_t(P, columnIndex);
+            rowReduce[i % rowReduceD1][j % rowReduceD2] = prevRow.value > P ? prevRow 
+                                                                            : aggregate_t(P, columnIndex);
 
             const aggregate_t prevColumn = (j < nColumns - 1 && i > 0) ? columnAggregates[j + 1][i % 2] 
                                                                        : aggregate_t_init;
@@ -89,4 +90,3 @@ void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iter
         result[i] = {rowAggregate, columnAggregate};
     }
 }
-
