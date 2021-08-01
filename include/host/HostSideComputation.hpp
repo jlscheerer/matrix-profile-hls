@@ -2,13 +2,17 @@
 
 #include "Config.hpp"
 
+#include "host/Timer.hpp"
+#include "host/BenchmarkProfile.hpp"
+
 #include <array>
 #include <numeric>
 #include <cmath>
 
 namespace HostSideComputation {
 
-    void PrecomputeStatistics(std::array<double, n> &T, std::array<InputDataPack, n - m + 1> &data) {
+    static void PreComputeStatistics(BenchmarkProfile &profile, std::array<double, n> &T, std::array<InputDataPack, n - m + 1> &data) {
+        Timer timer;
         // Calculate the initial mean, then update using moving mean.
         double mean = std::accumulate(T.begin(), T.begin() + m, static_cast<double>(0)); mean /= m;
         double prev_mu, mu0 = mean;
@@ -30,11 +34,33 @@ namespace HostSideComputation {
             data[i].QT = qt;
             data[i].inv = (1 / std::sqrt(inv));
         }
+        const auto time = timer.Elapsed();
+        profile.Push("1. Host-Side [Pre-Computation]", time);
     }
 
-    void PearsonCorrelationToEuclideanDistance(std::array<data_t, n - m + 1> &PearsonCorrelation, std::array<double, n - m + 1> &EuclideanDistance) {
-        for (index_t i = 0; i < n - m + 1; ++i)
-            EuclideanDistance[i] = std::sqrt(static_cast<double>(2 * m * (1 - PearsonCorrelation[i])));
+    static double PearsonCorrelationToEuclideanDistance(const index_t n, const index_t m, const double P) {
+        return std::sqrt(2 * m * (1 - P));
+    }
+
+    static void PostComputeAggregates(BenchmarkProfile &profile, const std::array<aggregate_t, n - m + 1> &rowAggregates,
+                               const std::array<aggregate_t, n - m + 1> &columnAggregates, std::array<double, n - m + 1> &MP,
+                               std::array<index_t, n - m + 1> &MPI) {
+        Timer timer;
+        // merge aggregates at the "very" end
+        for (index_t i = 0; i < n - m + 1; ++i) {
+            aggregate_t rowAggregate = rowAggregates[i];
+            aggregate_t columnAggregate = columnAggregates[i];
+        
+            // merge the aggregates by taking the maximum
+            aggregate_t aggregate = rowAggregate.value > columnAggregate.value ? rowAggregate : columnAggregate;
+
+            // directly convert obtained pearson correlation to euclidean distance
+            MP[i] = PearsonCorrelationToEuclideanDistance(n, m, aggregate.value);
+            MPI[i] = aggregate.index;
+        }
+        const auto time = timer.Elapsed();
+        profile.Push("4. Host-Side [Post-Computation]", time);
     }
 
 }
+

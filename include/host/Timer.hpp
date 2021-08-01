@@ -10,9 +10,10 @@
 #include <iomanip>
 #include <ostream>
 
-class Timer{
+class Timer {
     public:
-        Timer(){ m_tick = std::chrono::high_resolution_clock::now(); }
+        Timer(){ Reset(); }
+        void Reset() { m_tick = std::chrono::high_resolution_clock::now(); }
         std::chrono::nanoseconds Elapsed(){ return std::chrono::high_resolution_clock::now() - m_tick; }
     private:
         std::chrono::time_point<std::chrono::high_resolution_clock> m_tick;

@@ -22,7 +22,7 @@
 
 #include "host/OpenCL.hpp"
 #include "host/FileIO.hpp"
-#include "host/Timer.hpp"
+#include "host/BenchmarkProfile.hpp"
 #include "host/Logger.hpp"
 
 using tl::optional;
@@ -32,10 +32,6 @@ using Logger::LogLevel;
 using OpenCL::Access;
 using OpenCL::MemoryBank;
 
-static double PearsonCorrelationToEuclideanDistance(const index_t n, const index_t m, const double P) {
-    return std::sqrt(2 * m * (1 - P));
-}
-
 /**
  * @param xclbin full path to the (.xclbin) binary
  * @param input  input (time series) file name (without extension), located under data/binary/
@@ -43,7 +39,9 @@ static double PearsonCorrelationToEuclideanDistance(const index_t n, const index
  *               the result will be stored as a .mpb (matrix profile) and a .mpib (matrix profile index) file
  * @return int   EXIT_SUCCESS in the case of a sucessful execution and EXIT_FAILURE otherwise
  */
-int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, const optional<std::string> &output){
+int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, const optional<std::string> &output){    
+    BenchmarkProfile profile;
+
     // Allocate Host-Side Memory
     std::array<double, n> host_T;
     std::array<InputDataPack, n - m + 1> host_input;
@@ -52,13 +50,16 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     // Matrix Profile (Euclidean Distance)
     std::array<double, n - m + 1> host_MPE;
 
+    if (!output)
+        Log<LogLevel::Warning>("No output (-o, --output) parameter provided. Results will be discarded!");
+
     // Load Input File Containing Time Series Data into Host Memory
     Log<LogLevel::Verbose>("Loading input time series...");
     if(!FileIO::ReadBinaryFile(input, host_T))
         return EXIT_FAILURE;
 
-    Log<LogLevel::Info>("Precomputing Statistics on Host");
-    HostSideComputation::PrecomputeStatistics(host_T, host_input);
+    Log<LogLevel::Info>("Pre-Computing Statistics on Host");
+    HostSideComputation::PreComputeStatistics(profile, host_T, host_input);
 
     Log<LogLevel::Verbose>("Initializing OpenCL context...");
     OpenCL::Context context;
@@ -90,22 +91,18 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
         const index_t nOffset = iteration * nColumns;
         const index_t nRows = n - m + 1 - nOffset;
 
-        // Log<LogLevel::Verbose>("Creating Kernel...");
         OpenCL::Kernel kernel{
             program.MakeKernel(KernelTLF, n, m, iteration, buffer_columns, buffer_rows, buffer_output)
         };
 
-        // Log<LogLevel::Verbose>("Executing Kernel...");
-        std::chrono::nanoseconds executionTime{
-            kernel.ExecuteTask()
-        };
+        profile.Push("2. FPGA Computation [" + (std::string(KERNEL_IMPL_NAME)) + ", w=" + std::to_string(w) + "]", 
+                     KernelTLF + " [iteration=" + std::to_string(iteration) + ", nRows=" + std::to_string(nRows) + "]", kernel.ExecuteTask());
 
-        Log<LogLevel::Verbose>("Kernel completed successfully in", executionTime);
-
-        Log<LogLevel::Verbose>("Copying back result...");
+        // Copy back the intermediate result
         buffer_output.CopyToHost(host_output.data(), nRows);
 
-        // Update Local "Copies" of Aggregates
+        // Update Local "copies" of Aggregates
+        Timer timer;
         for (index_t i = 0; i < nRows; ++i) {
             aggregate_t prevRow = iteration > 0 ? rowAggregates[i] : aggregate_t_init;
             aggregate_t prevCol = iteration > 0 ? columnAggregates[i + nOffset] : aggregate_t_init;
@@ -116,23 +113,15 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
             rowAggregates[i] = currRow.value > prevRow.value ? currRow : prevRow;
             columnAggregates[i + nOffset] = currCol.value > prevCol.value ? currCol : prevCol;
         }
+        const auto time = timer.Elapsed();
+        profile.Push("3. Host-Side [Aggregate-Merge]", "Aggregate_Merge_" + std::to_string(iteration), time);
     }
 
     std::array<double, n - m + 1> MP;
     std::array<index_t, n - m + 1> MPI;
 
-    // merge aggregates at the "very" end
-    for (index_t i = 0; i < n - m + 1; ++i) {
-        aggregate_t rowAggregate = rowAggregates[i];
-        aggregate_t columnAggregate = columnAggregates[i];
-    
-        // merge the aggregates by taking the maximum
-        aggregate_t aggregate = rowAggregate.value > columnAggregate.value ? rowAggregate : columnAggregate;
-
-        // directly convert obtained pearson correlation to euclidean distance
-        MP[i] = PearsonCorrelationToEuclideanDistance(n, m, aggregate.value);
-        MPI[i] = aggregate.index;
-    }
+    Log<LogLevel::Info>("Performing Post-Computation on Host");
+    HostSideComputation::PostComputeAggregates(profile, rowAggregates, columnAggregates, MP, MPI);
 
     // Log<LogLevel::Info>("Converting Pearson Correlation to Euclidean Distance");
     // HostSideComputation::PearsonCorrelationToEuclideanDistance(host_MP, host_MPE);
@@ -145,18 +134,9 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
         // Write the Matrix Profile Index to disk
         if(!FileIO::WriteBinaryFile((*output) + ".mpib", MPI))
             return EXIT_FAILURE;
-    }else{
-        // Just output the result to the console (for debugging)
-        std::cout << "MP:";
-        for(size_t i = 0; i < n - m + 1; ++i)
-    	    std::cout << " " << MP[i];
-        std::cout << std::endl;
-
-        std::cout << "MPI:";
-        for(size_t i = 0; i < n - m + 1; ++i)
-            std::cout << " " << MPI[i];
-        std::cout << std::endl;
     }
+
+    profile.Report();
 
     Log<LogLevel::Verbose>("Terminating Host.");
 
@@ -178,7 +158,7 @@ int main(int argc, char* argv[]) {
         ("v,version", "prints version information and exits")
         ("h,help", "shows help message and exits");
 
-    try{
+    try {
         auto args{options.parse(argc, argv)};
 
         if(args.count("help")){
@@ -213,10 +193,11 @@ int main(int argc, char* argv[]) {
                                      : optional<std::string>{} };
 
         return RunMatrixProfileKernel(xclbin, input, output);
-    }catch(const cxxopts::option_not_exists_exception&){
+    } catch(const cxxopts::option_not_exists_exception&) {
         Log<LogLevel::Error>("Unknown argument\n");
         std::cout << options.help() << std::endl;
         return EXIT_FAILURE;
     }
 }
+
 
