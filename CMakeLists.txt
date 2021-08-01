@@ -129,9 +129,9 @@ configure_file(config/compile-config.cfg.in config/compile-config.cfg)
 configure_file(config/link-config.cfg.in config/link-config.cfg)
 
 if(NOT("${MP_KERNEL}" STREQUAL "Streamless"))
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/reports/build-info.txt" "[Configuration]\nMP_PLATFORM=${MP_PLATFORM}\nMP_EMBEDDED=${MP_EMBEDDED}\nMP_TARGET=${MP_TARGET}\nMP_QUICK_BUILD=${MP_QUICK_BUILD}\n\nMP_KERNEL=${MP_KERNEL}\nMP_SIZE_N=${MP_SIZE_N}\nMP_SIZE_M=${MP_SIZE_M}\nMP_SIZE_T=${MP_SIZE_T}\n\nMP_DATA_TYPE=${MP_DATA_TYPE}\nMP_INDEX_TYPE=${MP_INDEX_TYPE}\n")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/reports/build-info.txt" "[Configuration]\nMP_PLATFORM=${MP_PLATFORM}\nMP_EMBEDDED=${MP_EMBEDDED}\nMP_TARGET=${MP_TARGET}\nMP_QUICK_BUILD=${MP_QUICK_BUILD}\n\nMP_KERNEL=${MP_KERNEL}\nMP_SIZE_N=${MP_SIZE_N}\nMP_SIZE_M=${MP_SIZE_M}\nMP_SIZE_W=${MP_SIZE_W}\nMP_SIZE_T=${MP_SIZE_T}\n\nMP_DATA_TYPE=${MP_DATA_TYPE}\nMP_INDEX_TYPE=${MP_INDEX_TYPE}\n")
 else()
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/reports/build-info.txt" "[Configuration]\nMP_PLATFORM=${MP_PLATFORM}\nMP_EMBEDDED=${MP_EMBEDDED}\nMP_TARGET=${MP_TARGET}\nMP_QUICK_BUILD=${MP_QUICK_BUILD}\n\nMP_KERNEL=${MP_KERNEL}\nMP_SIZE_N=${MP_SIZE_N}\nMP_SIZE_M=${MP_SIZE_M}\n\nMP_DATA_TYPE=${MP_DATA_TYPE}\nMP_INDEX_TYPE=${MP_INDEX_TYPE}\n")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/reports/build-info.txt" "[Configuration]\nMP_PLATFORM=${MP_PLATFORM}\nMP_EMBEDDED=${MP_EMBEDDED}\nMP_TARGET=${MP_TARGET}\nMP_QUICK_BUILD=${MP_QUICK_BUILD}\n\nMP_KERNEL=${MP_KERNEL}\nMP_SIZE_N=${MP_SIZE_N}\nMP_SIZE_M=${MP_SIZE_M}\nMP_SIZE_W=${MP_SIZE_W}\n\nMP_DATA_TYPE=${MP_DATA_TYPE}\nMP_INDEX_TYPE=${MP_INDEX_TYPE}\n")
 endif()
 
 # Only Generate Platform Configuration for Embedded Platforms
