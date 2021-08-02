@@ -1,10 +1,10 @@
 # Matrix Profile Computation on Xilinx FPGAs [![BSD3 License](https://img.shields.io/badge/License-BSDv3-blue.svg)](LICENSE.md) [![Build Status](https://travis-ci.com/jlscheerer/matrix-profile-hls.svg?token=dmssrYE2KgMinUZ9Pecp&branch=master)](https://travis-ci.com/jlscheerer/matrix-profile-hls)
 
-This repository includes multiple pure Vitis™ HLS implementations of the Matrix Profile Computation Algorithm [SCAMP](https://github.com/zpzim/SCAMP) for Xilinx FPGAs, using Xilinx Vitis™ to instantiate memory and PCIe controllers and interface with the host.
+This repository includes mmultiple Vitis™ HLS implementations of the Matrix Profile Computation Algorithm [SCAMP](https://github.com/zpzim/SCAMP) for Xilinx FPGAs, using Xilinx Vitis™ to instantiate memory and PCIe controllers and interface with the host.
 
 The Matrix Profile is a novel data structure with corresponding algorithms (stomp, regimes, motifs, etc.) developed by the [Keogh](https://www.cs.ucr.edu/~eamonn/MatrixProfile.html) and [Mueen](https://www.cs.unm.edu/~mueen/) research groups at UC-Riverside and the University of New Mexico. 
 
-The source files for the different implementation of the compute kernel can be found under [``kernel/MatrixProfileKernelStreamless.cpp``](kernel/MatrixProfileKernelStreamless.cpp), [``kernel/MatrixProfileKernelStream1D.cpp``](kernel/MatrixProfileKernelStream1D.cpp) and [``kernel/MatrixProfileKernelStream2D.cpp``](kernel/MatrixProfileKernelStream2D.cpp).
+The source files for the different implementation of the compute kernel can be found under [``kernel/MatrixProfileKernelStreamless.cpp``](kernel/MatrixProfileKernelStreamless.cpp) and [``kernel/MatrixProfileKernelStream1D.cpp``](kernel/MatrixProfileKernelStream1D.cpp).
 
 The host application is in [``host/MatrixProfileHost.cpp``](host/MatrixProfileHost.cpp). This repository contains a light-weight OpenCL™ wrapper for the interaction with the FPGA kernel, which is located in [``include/host/OpenCL.hpp``](include/host/OpenCL.hpp).
 
@@ -32,7 +32,7 @@ An example of configuring the kernel (starting from the ``root`` directory):
 
 ```bash
 mkdir build && cd build
-cmake .. -DMP_KERNEL=Stream1D -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=256 -DMP_SIZE_M=32 -DMP_SIZE_T=64
+cmake .. -DMP_KERNEL=Stream1D -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=65536 -DMP_SIZE_M=128 -DMP_SIZE_W=2048 -DMP_SIZE_T=64
 make host
 make compile
 make link
@@ -42,12 +42,13 @@ make link
 
 | **CMake Parameter** | **Description**           | **Values**                                                            |
 |---------------------|---------------------------|-----------------------------------------------------------------------|
-| ``MP_KERNEL``       | Kernel-Implementation     | ``Streamless``, ``Stream1D``, ``Stream2D``                            |
+| ``MP_KERNEL``       | Kernel-Implementation     | ``Streamless``, ``Stream1D``                                          |
 | ``MP_DATA_TYPE``    | Data Type for Computation | ``double``, ``float``, ``ap16_t``, ``ap24_t``, ``ap32_t``, ``ap64_t`` |
 | ``MP_TARGET``       | Compilation Target        | ``sw_emu``, ``hw_emu``, ``hw``                                        |
 | ``DMP_SIZE_N``      | Length of the Time Series |                                                                       |
 | ``DMP_SIZE_M``      | Subsequence Length        |                                                                       |
-| ``DMP_SIZE_T``      | Tile-Size                 | *only applicable for Stream1D/Stream2D-Kernel*                        |
+| ``DMP_SIZE_W``      | Tile-Size (Host-Side)     |                                                                       |
+| ``DMP_SIZE_T``      | Tile-Size (Device-Side)   | *only applicable for Stream1D-Kernel*                                 |
 
 For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platforms) see [``CMakeLists.txt``](CMakeLists.txt).
 
@@ -56,7 +57,7 @@ Per default the build targets the Alveo U250 acceleration board, but this can be
 ### Executing the Kernel
 After having ``build`` the host application and `link`ed the Kernel, execute the Kernel on input [``data/binary/small128_syn.tsb``](data/binary/small128_syn.tsb) (run this in the ``build`` directory) via:
 ```bash
-./MatrixProfileHost -b MatrixProfileKernel.xclbin -i ../data/binary/small128_syn.tsb --verbose
+./MatrixProfileHost -b MatrixProfileKernel.xclbin -i ../data/binary/65536.tsb --verbose
 ```
 A list of example datasets as well as instruction on how to use your own dataset can be found [here](data/).
 
@@ -70,7 +71,7 @@ cmake .. -DSKIP_CHECKS=ON -DBUILD_TESTS=ON
 make && make test
 ```
 
-The corresponding source files can be found under [``test/TestStreamlessKernel.cpp``](test/TestStreamlessKernel.cpp), [``test/TestStream1DKernel.cpp``](test/TestStream1DKernel.cpp) and [``test/TestStream2DKernel.cpp``](test/TestStream2DKernel.cpp)
+The corresponding source files can be found under [``test/TestStreamlessKernel.cpp``](test/TestStreamlessKernel.cpp) and [``test/TestStream1DKernel.cpp``].
 
 ## Bugs
 If you experience bugs, or have suggestions for improvements, please use the issue tracker to report them.
