@@ -1,3 +1,9 @@
+/**
+ * @file    HostSideComputation.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   Host-Side Computation (Pre-Computation & Post-Computation)
+ */
+
 #pragma once
 
 #include "Config.hpp"

@@ -1,3 +1,9 @@
+/**
+ * @file    BenchmarkProfile.hpp
+ * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
+ * @brief   Utilities to Benchmark Computation Times
+ */
+
 #pragma once
 
 #include "host/Timer.hpp"
