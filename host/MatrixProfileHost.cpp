@@ -32,6 +32,18 @@ using Logger::LogLevel;
 using OpenCL::Access;
 using OpenCL::MemoryBank;
 
+// Allocate Host-Side Memory (needs to be statically allocated!)
+static std::array<double, n> host_T;
+static std::array<InputDataPack, n - m + 1> host_input;
+static std::array<OutputDataPack, n - m + 1> host_output;
+
+// Intermediate Results Storing column- & row-wise aggregates
+static std::array<aggregate_t, n - m + 1> rowAggregates, columnAggregates;
+
+// Resulting Matrix Profile and corresponding Matrix Profile Index
+static std::array<double, n - m + 1> MP;
+static std::array<index_t, n - m + 1> MPI;
+
 /**
  * @param xclbin full path to the (.xclbin) binary
  * @param input  input (time series) file name (without extension), located under data/binary/
@@ -41,14 +53,6 @@ using OpenCL::MemoryBank;
  */
 int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, const optional<std::string> &output){    
     BenchmarkProfile profile;
-
-    // Allocate Host-Side Memory
-    std::array<double, n> host_T;
-    std::array<InputDataPack, n - m + 1> host_input;
-    std::array<OutputDataPack, n - m + 1> host_output;
-
-    // Matrix Profile (Euclidean Distance)
-    std::array<double, n - m + 1> host_MPE;
 
     if (!output)
         Log<LogLevel::Warning>("No output (-o, --output) parameter provided. Results will be discarded!");
@@ -84,10 +88,11 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     buffer_columns.CopyFromHost(host_input.cbegin(), host_input.cend());
     buffer_rows.CopyFromHost(host_input.cbegin(), host_input.cend());
 
-    std::array<aggregate_t, n - m + 1> rowAggregates, columnAggregates;
+    Log<LogLevel::Verbose>("Starting Kernel Execution(s)...");
 
     constexpr index_t nIterations = (n - m + nColumns) / nColumns;
     for (index_t iteration = 0; iteration < nIterations; ++iteration) {
+
         const index_t nOffset = iteration * nColumns;
         const index_t nRows = n - m + 1 - nOffset;
 
@@ -117,8 +122,7 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
         profile.Push("3. Host-Side [Aggregate-Merge]", "Aggregate_Merge_" + std::to_string(iteration), time);
     }
 
-    std::array<double, n - m + 1> MP;
-    std::array<index_t, n - m + 1> MPI;
+    Log<LogLevel::Info>("Kernel Execution Completed Successfully.");
 
     Log<LogLevel::Info>("Performing Post-Computation on Host");
     HostSideComputation::PostComputeAggregates(profile, rowAggregates, columnAggregates, MP, MPI);
