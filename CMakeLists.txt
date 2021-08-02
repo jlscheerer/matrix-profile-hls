@@ -82,7 +82,7 @@ if(NOT(${MP_SIZE_M} MATCHES "^[0-9]+$") OR ${MP_SIZE_N} LESS ${MP_SIZE_M})
     message(FATAL_ERROR "The specified value for 'MP_SIZE_M' [\"${MP_SIZE_M}\"] is invalid, m has to be numeric and ≤ n!")
 endif()
 
-if(NOT("${MP_KERNEL}" STREQUAL "Streamless") AND (NOT(${MP_SIZE_T} MATCHES "^[0-9]+$") OR ${MP_SIZE_T} LESS ${MP_SIZE_M}))
+if(NOT("${MP_KERNEL}" STREQUAL "Streamless") AND (NOT(${MP_SIZE_T} MATCHES "^[0-9]+$")))
     message(FATAL_ERROR "The specified value for 'MP_SIZE_T' [\"${MP_SIZE_T}\"] is invalid, t has to be numeric and ≥ m!")
 endif()
 # /check parameter validity
