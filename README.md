@@ -1,6 +1,6 @@
 # Matrix Profile Computation on Xilinx FPGAs [![BSD3 License](https://img.shields.io/badge/License-BSDv3-blue.svg)](LICENSE.md) [![Build Status](https://travis-ci.com/jlscheerer/matrix-profile-hls.svg?token=dmssrYE2KgMinUZ9Pecp&branch=master)](https://travis-ci.com/jlscheerer/matrix-profile-hls)
 
-This repository includes mmultiple Vitis™ HLS implementations of the Matrix Profile Computation Algorithm [SCAMP](https://github.com/zpzim/SCAMP) for Xilinx FPGAs, using Xilinx Vitis™ to instantiate memory and PCIe controllers and interface with the host.
+This repository includes multiple Vitis™ HLS implementations of the Matrix Profile Computation Algorithm [SCAMP](https://github.com/zpzim/SCAMP) for Xilinx FPGAs, using Xilinx Vitis™ to instantiate memory and PCIe controllers and interface with the host.
 
 The Matrix Profile is a novel data structure with corresponding algorithms (stomp, regimes, motifs, etc.) developed by the [Keogh](https://www.cs.ucr.edu/~eamonn/MatrixProfile.html) and [Mueen](https://www.cs.unm.edu/~mueen/) research groups at UC-Riverside and the University of New Mexico. 
 

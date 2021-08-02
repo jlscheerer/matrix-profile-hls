@@ -28,27 +28,27 @@ namespace MatrixProfileTests {
 
     TEST(TestStream1DKernel, TestSmall128SynM16) {
         Stream1DKernel<double, int, 32, 16> kernel;
-        TestMatrixProfileKernel<double, int, 128, 16, 32>(kernel, "synthetic/small128_syn.txt");
+        TestMatrixProfileKernel<double, int, 128, 16, 32>(kernel, "test/small128_syn.txt");
     }
 
     TEST(TestStream1DKernel, TestBenchmark1024SynM16W32T16) {
         Stream1DKernel<double, int, 32, 16> kernel;
-        TestMatrixProfileKernel<double, int, 1024, 16, 32>(kernel, "benchmark/1024.txt");
+        TestMatrixProfileKernel<double, int, 1024, 16, 32>(kernel, "test/1024.txt");
     }
 
     TEST(TestStream1DKernel, TestBenchmark1024SynM16W256T128) {
         Stream1DKernel<double, int, 256, 128> kernel;
-        TestMatrixProfileKernel<double, int, 1024, 16, 256>(kernel, "benchmark/1024.txt");
+        TestMatrixProfileKernel<double, int, 1024, 16, 256>(kernel, "test/1024.txt");
     }
 
     TEST(TestStream1DKernel, TestBenchmark1024SynM32W256T128) {
         Stream1DKernel<double, int, 512, 128> kernel;
-        TestMatrixProfileKernel<double, int, 1024, 32, 512>(kernel, "benchmark/1024.txt");
+        TestMatrixProfileKernel<double, int, 1024, 32, 512>(kernel, "test/1024.txt");
     }
 
     TEST(TestStream1DKernel, TestBenchmark16384SynM128W1024T128) {
         Stream1DKernel<double, int, 1024, 128> kernel;
-        TestMatrixProfileKernel<double, int, 16384, 128, 1024>(kernel, "benchmark/16384.txt");
+        TestMatrixProfileKernel<double, int, 16384, 128, 1024>(kernel, "test/16384.txt");
     }
 
 }

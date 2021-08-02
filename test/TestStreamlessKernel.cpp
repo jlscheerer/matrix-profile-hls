@@ -28,17 +28,17 @@ namespace MatrixProfileTests {
     
     TEST(TestStreamlessKernel, TestSmall128SynM16W32) {
         StreamlessKernel<double, int, 32> kernel;
-        TestMatrixProfileKernel<double, int, 128, 16, 32>(kernel, "synthetic/small128_syn.txt");
+        TestMatrixProfileKernel<double, int, 128, 16, 32>(kernel, "test/small128_syn.txt");
     }
 
     TEST(TestStreamlessKernel, TestBenchmark1024SynM16W32) {
         StreamlessKernel<double, int, 32> kernel;
-        TestMatrixProfileKernel<double, int, 1024, 16, 32>(kernel, "benchmark/1024.txt");
+        TestMatrixProfileKernel<double, int, 1024, 16, 32>(kernel, "test/1024.txt");
     }
     
     TEST(TestStream1DKernel, TestBenchmark16384SynM128W1024) {
         StreamlessKernel<double, int, 1024> kernel;
-        TestMatrixProfileKernel<double, int, 16384, 128, 1024>(kernel, "benchmark/16384.txt");
+        TestMatrixProfileKernel<double, int, 16384, 128, 1024>(kernel, "test/16384.txt");
     }
 
 }
