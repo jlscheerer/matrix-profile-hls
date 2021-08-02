@@ -2,6 +2,7 @@
 import os
 import struct
 import argparse
+import gzip
 
 # supported types for the binary files
 # https://docs.python.org/3/library/struct.html
@@ -73,8 +74,13 @@ def read_ascii(filename, type = None):
         exit(-1)
     (format, length, fn) = types[type]
     try:
-        with open(filename, 'r') as file:
-            data = file.readlines()
+        if filename.endswith('.txt'):
+            with open(filename, 'r') as file:
+                data = file.readlines()
+        elif filename.endswith('.txt.gz'):
+            with gzip.open(filename, 'rb') as file:
+                data = file.readlines()
+            data = [x.decode('utf-8') for x in data]
     except:
         log(f'Cannot read file "{filename}"', LogTypeError)
         exit(-1)
