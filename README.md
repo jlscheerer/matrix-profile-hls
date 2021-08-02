@@ -71,7 +71,7 @@ cmake .. -DSKIP_CHECKS=ON -DBUILD_TESTS=ON
 make && make test
 ```
 
-The corresponding source files can be found under [``test/TestStreamlessKernel.cpp``](test/TestStreamlessKernel.cpp) and [``test/TestStream1DKernel.cpp``].
+The corresponding source files can be found under [``test/TestStreamlessKernel.cpp``](test/TestStreamlessKernel.cpp) and [``test/TestStream1DKernel.cpp``](test/TestStream1DKernel.cpp).
 
 ## Bugs
 If you experience bugs, or have suggestions for improvements, please use the issue tracker to report them.
