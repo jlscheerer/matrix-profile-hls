@@ -24,6 +24,7 @@ void MemoryToStream(const index_t n, const index_t m, const index_t iteration,
     MemoryToStreamScatter:
     for (index_t i = 0; i < nColumns; ++i) {
         #pragma HLS PIPELINE II=1
+        
         const index_t columnIndex = nOffset + i;
         const InputDataPack read = (columnIndex < n - m + 1) ? columns[columnIndex]
                                                              : InputDataPack(0);
@@ -74,6 +75,7 @@ void ProcessingElement(const index_t n, const index_t m,
     MatrixProfileScatter:
     for (index_t i = 0; i < loopCount; ++i) {
         #pragma HLS PIPELINE II=1
+        
         InputDataPack read = scatter_in.read();
         if (i >= afterMe) {
             QT[i - afterMe] = read.QT;
@@ -144,6 +146,7 @@ void ProcessingElement(const index_t n, const index_t m,
         MatrixProfileShift:
         for (index_t j = 0; j < t - 1; ++j) {
             #pragma HLS PIPELINE II=1
+            
             columns[j] = columns[j + 1];
             columnAggregates[j] = columnAggregates[j + 1];
         }
@@ -163,6 +166,7 @@ void StreamToMemory(const index_t n, const index_t m, const index_t iteration,
     StreamToMemoryReduce:
     for (index_t i = 0; i < nRows; ++i) {
         #pragma HLS PIPELINE II=1
+        
         const ComputePack read = compute.read();
 
         const aggregate_t rowAggregate = read.rowAggregate;
@@ -189,6 +193,7 @@ void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iter
 
     for (index_t i = 0; i < nPE; ++i) {
         #pragma HLS UNROLL
+        
         ProcessingElement(n, m, iteration, i, scatter[i], compute[i], 
                           scatter[i + 1], compute[i + 1]);
     }
