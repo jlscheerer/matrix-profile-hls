@@ -48,6 +48,8 @@ void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iter
 
     MatrixProfileInitQT:
     for (index_t i = 0; i < nColumns; ++i) {
+	#pragma HLS PIPELINE II=1
+
         const index_t columnIndex = nOffset + i;
         const bool inBounds = columnIndex < n - m + 1;
         const InputDataPack read = inBounds ? columns[columnIndex]
@@ -62,6 +64,8 @@ void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iter
 
         MatrixProfileComputeTile:
         for (index_t j = 0; j < nColumns; ++j) {
+	    #pragma HLS PIPELINE II=1
+
             const index_t columnIndex = nOffset + i + j;
 
             const bool columnInBounds = columnIndex < n - m + 1;
