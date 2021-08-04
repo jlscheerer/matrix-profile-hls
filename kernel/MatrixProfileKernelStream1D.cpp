@@ -122,7 +122,7 @@ void ProcessingElement(const index_t n, const index_t m,
             const bool exclusionZone = rowIndex > columnIndex - m / 4;
             const bool inBounds = columnInBounds && !exclusionZone;
 
-            const data_t P = inBounds ? QT[j] * row.inv * column.inv : 0;
+            const data_t P = inBounds ? static_cast<data_t>(QT[j] * row.inv * column.inv) : static_cast<data_t>(0);
 
             const aggregate_t prevRow = (j < rowReduceD2) ? rowAggregateBackward 
                                                           : rowReduce[i % rowReduceD1][j % rowReduceD2];

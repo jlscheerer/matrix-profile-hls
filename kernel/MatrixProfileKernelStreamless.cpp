@@ -72,7 +72,7 @@ void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iter
                                                         : InputDataPack(0);
 
             QT[j] += row.df * column.dg + column.df * row.dg;
-            const data_t P = inBounds ? QT[j] * row.inv * column.inv : 0;
+            const data_t P = inBounds ? static_cast<data_t>(QT[j] * row.inv * column.inv) : static_cast<data_t>(0);
 
             const aggregate_t prevRow = (j < rowReduceD2) ? aggregate_t_init 
                                                           : rowReduce[i % rowReduceD1][j % rowReduceD2];
