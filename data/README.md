@@ -13,6 +13,6 @@ python3 util/tsbin.py -t double -d result.mpb -o result_mp.txt
 python3 util/tsbin.py -t int -d result.mpib -o result_mpi.txt
 ````
 
-For those just wanting to test the project: some exemplary datasets (in the correct format) can are provided under [data/binary](binary/)
+For those just wanting to test the project: some exemplary datasets (in the correct format) are provided under [data/binary](binary/)
 
 Additionally, this repository contains further datasets used for benchmarking. Most of these datasets are from a [Repository by the Matrix Profile Foundation](https://github.com/matrix-profile-foundation/mpf-datasets). (These, however, have to be encoded as described above).
