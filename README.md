@@ -32,7 +32,7 @@ An example of configuring the kernel (starting from the ``root`` directory):
 
 ```bash
 mkdir build && cd build
-cmake .. -DMP_KERNEL=Stream1D -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=65536 -DMP_SIZE_M=128 -DMP_SIZE_W=2048 -DMP_SIZE_T=64
+cmake .. -DMP_KERNEL=Stream1D -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=65536 -DMP_SIZE_M=256 -DMP_SIZE_W=4096 -DMP_SIZE_T=128
 make host
 make compile
 make link
