@@ -55,7 +55,7 @@ For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platfo
 Per default the build targets the Alveo U250 acceleration board, but this can be configured using the ``MP_PLATFORM`` CMake parameter.
 
 ### Executing the Kernel
-After having ``build`` the host application and `link`ed the Kernel, execute the Kernel on input [``data/binary/small128_syn.tsb``](data/binary/small128_syn.tsb) (run this in the ``build`` directory) via:
+After having ``build`` the host application and `link`ed the Kernel, execute the Kernel on input [``data/binary/65536.tsb``](data/binary/65536.tsb) (run this in the ``build`` directory) via:
 ```bash
 ./MatrixProfileHost -b MatrixProfileKernel.xclbin -i ../data/binary/65536.tsb --verbose
 ```
