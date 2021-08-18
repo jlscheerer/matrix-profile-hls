@@ -32,7 +32,7 @@ An example of configuring the kernel (starting from the ``root`` directory):
 
 ```bash
 mkdir build && cd build
-cmake .. -DMP_KERNEL=Stream1D -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=65536 -DMP_SIZE_M=256 -DMP_SIZE_W=4096 -DMP_SIZE_T=128
+cmake .. -DMP_KERNEL=Tiled -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=65536 -DMP_SIZE_M=256 -DMP_SIZE_W=4096 -DMP_SIZE_T=128
 make host
 make compile
 make link
@@ -40,15 +40,15 @@ make link
 
 ### Build Parameters
 
-| **CMake Parameter** | **Description**           | **Values**                                                            |
-|---------------------|---------------------------|-----------------------------------------------------------------------|
-| ``MP_KERNEL``       | Kernel-Implementation     | ``Streamless``, ``Stream1D``                                          |
-| ``MP_DATA_TYPE``    | Data Type for Computation | ``double``, ``float``, ``ap16_t``, ``ap24_t``, ``ap32_t``, ``ap64_t`` |
-| ``MP_TARGET``       | Compilation Target        | ``sw_emu``, ``hw_emu``, ``hw``                                        |
-| ``DMP_SIZE_N``      | Length of the Time Series |                                                                       |
-| ``DMP_SIZE_M``      | Subsequence Length        |                                                                       |
-| ``DMP_SIZE_W``      | Tile-Size (Host-Side)     |                                                                       |
-| ``DMP_SIZE_T``      | Tile-Size (Device-Side)   | *only applicable for Stream1D-Kernel*                                 |
+| **CMake Parameter** | **Description**           | **Values**                         |
+|---------------------|---------------------------|------------------------------------|
+| ``MP_KERNEL``       | Kernel-Implementation     | ``Vanilla``, ``Tiled``             |
+| ``MP_DATA_TYPE``    | Data Type for Computation | ``float``, ``double``              |
+| ``MP_TARGET``       | Compilation Target        | ``sw_emu``, ``hw_emu``, ``hw``     |
+| ``DMP_SIZE_N``      | Length of the Time Series |                                    |
+| ``DMP_SIZE_M``      | Subsequence Length        |                                    |
+| ``DMP_SIZE_W``      | Tile-Size (Host-Side)     |                                    |
+| ``DMP_SIZE_T``      | Tile-Size (Device-Side)   | *only applicable for Tiled-Kernel* |
 
 For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platforms) see [``CMakeLists.txt``](CMakeLists.txt).
 
