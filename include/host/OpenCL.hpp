@@ -226,6 +226,7 @@ namespace OpenCL{
     class Kernel{
         public:
             Kernel(Program &program, const std::string &name);
+            Kernel(Program &program, const std::string &name, const int computeUnitId);
 
             void EnqueueTask();
 
@@ -364,6 +365,10 @@ namespace OpenCL{
         if(errorCode != CL_SUCCESS)
             throw RuntimeError("Failed to create kernel with name '" + name + "'");
     }
+
+    // Specify the "Compute Unit" explicitly via Kernel:{ComputeUnit} Syntax
+    Kernel::Kernel(Program &program, const std::string &name, const int computeUnitId)
+        : Kernel(program, name + ":{" + name + "_" + std::to_string(computeUnitId) + "}") {}
 
     void Kernel::EnqueueTask(){
         m_program->commandQueue().enqueueTask(m_kernel);

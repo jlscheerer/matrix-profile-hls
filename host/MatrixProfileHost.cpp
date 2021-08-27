@@ -45,8 +45,6 @@ static std::array<aggregate_t, n - m + 1> rowAggregates, columnAggregates;
 static std::array<double, n - m + 1> MP;
 static std::array<index_t, n - m + 1> MPI;
 
-static std::array<MemoryBank, kNumKernels> banks{ MemoryBank::MemoryBank0, MemoryBank::MemoryBank1, MemoryBank::MemoryBank2 };
-
 void ProcessIteration(int iteration) {
 	const index_t nOffset = iteration * nColumns;
     const index_t nRows = n - m + 1 - nOffset;
@@ -110,17 +108,17 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     }
     context.commandQueue().finish();
 
-    // TODO: Change Kernel Constructor
     std::vector<OpenCL::Kernel> kernels;
-    for (index_t i = 0; i < kNumKernels; ++i) {
-	    // Specify the "Compute Unit" explicitly via Kernel:{ComputeUnit} Syntax
-	    kernels.emplace_back(program, KernelTLF + ":{" + KernelTLF + "_" + std::to_string(i + 1) + "}");
-    }
+    for (index_t i = 0; i < kNumKernels; ++i)
+	    kernels.emplace_back(program, KernelTLF, i + 1);
 
     Log<LogLevel::Verbose>("Starting Kernel Execution(s)...");
 
     constexpr index_t nIterations = (n - m + nColumns) / nColumns;
     for (index_t iteration = 0; iteration < nIterations; ++iteration) {
+        const index_t nOffset = iteration * nColumns;
+        const index_t nRows = n - m + 1 - nOffset;
+
         // Cyclically reference different Kernels 
         OpenCL::Kernel &kernel = kernels[iteration % kNumKernels];
 
