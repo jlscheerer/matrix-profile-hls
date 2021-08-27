@@ -128,7 +128,7 @@ namespace OpenCL{
                 // enqueueWriteBuffer() API call is a request to enqueue a write operation. This
                 // API call does not immediately initiate the data transfer. The data transfer happens
                 // when a kernel is enqueued which has the respective buffer as one of its arguments.
-                cl_int errorCode = m_context->commandQueue().enqueueWriteBuffer(m_buffer, CL_TRUE, 0, m_size * sizeof(T), hostPtr);
+                cl_int errorCode = m_context->commandQueue().enqueueWriteBuffer(m_buffer, CL_FALSE, 0, m_size * sizeof(T), hostPtr);
 
                 if(errorCode != CL_SUCCESS)
                     throw RuntimeError("Failed to copy data to device.");
@@ -138,7 +138,7 @@ namespace OpenCL{
                      std::enable_if<IsIteratorOfType<IteratorType, T>() && IsRandomAccess<IteratorType>()>::type>
             void CopyToHost(IteratorType target) {
                 // Data can be transferred back to the host using the read buffer operation
-                cl_int errorCode = m_context->commandQueue().enqueueReadBuffer(m_buffer, CL_TRUE, 0, m_size * sizeof(T), &(*target));
+                cl_int errorCode = m_context->commandQueue().enqueueReadBuffer(m_buffer, CL_FALSE, 0, m_size * sizeof(T), &(*target));
 
                 if(errorCode != CL_SUCCESS)
                     throw RuntimeError("Failed to copy data from device.");
@@ -235,7 +235,7 @@ namespace OpenCL{
 
             Program *m_program;
             cl::Kernel m_kernel;
-
+	public:
             template<typename T, Access access>
             void SetKernelArguments(size_t index, Buffer<T, access> &arg){
                 cl_int errorCode = m_kernel.setArg(index, arg.buffer());
@@ -287,7 +287,7 @@ namespace OpenCL{
     Context::Context(){
         m_device = FindDevice();
         m_context = cl::Context(m_device);
-        m_queue = cl::CommandQueue(m_context, m_device, CL_QUEUE_PROFILING_ENABLE);
+        m_queue = cl::CommandQueue(m_context, m_device, CL_QUEUE_PROFILING_ENABLE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE);
     }
 
     template<typename T, Access access>
@@ -369,7 +369,7 @@ namespace OpenCL{
         m_program->commandQueue().enqueueTask(m_kernel);
         // Record time required for execution
         Timer timer;
-        m_program->commandQueue().finish();
+        // m_program->commandQueue().finish();
         // Return the execution time
         return timer.Elapsed();
     }

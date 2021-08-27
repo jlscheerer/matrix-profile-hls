@@ -30,7 +30,9 @@ set(VALID_KERNELS Streamless Stream1D)
 set(MP_KERNEL "Stream1D" CACHE STRING "implementation to use for the matrix profile kernel {Streamless, Stream1D}")
 set_property(CACHE MP_KERNEL PROPERTY STRINGS ${VALID_KERNELS})
 
-set(VALID_DATA_TYPES double float ap16_t ap24_t ap32_t ap64_t)
+set(MP_KERNEL_REPL 1 CACHE STRING "number of kernel replications")
+
+set(VALID_DATA_TYPES double float)
 set(MP_DATA_TYPE "double" CACHE STRING "type for time series & resulting matrix profile")
 set_property(CACHE MP_DATA_TYPE PROPERTY STRINGS ${VALID_DATA_TYPES})
 
@@ -58,6 +60,10 @@ endif()
 list(FIND VALID_KERNELS ${MP_KERNEL} kernel_index)
 if(kernel_index EQUAL -1)
     message(FATAL_ERROR "The specified value for 'MP_KERNEL' [\"${MP_KERNEL}\"] is invalid.\nKernel has to be one of 'Streamless', 'Stream1D'.")
+endif()
+
+if(NOT(${MP_KERNEL_REPL} MATCHES "^[0-9]+$"))
+    message(FATAL_ERROR "The specified value for 'MP_KERNEL_REPL' [\"${MP_KERNEL_REPL}\"] is invalid, MP_KERNEL_REPL has to be numeric!")
 endif()
 
 list(FIND VALID_DATA_TYPES ${MP_DATA_TYPE} data_type_index)
@@ -110,6 +116,14 @@ if(NOT(SKIP_CHECKS))
 else()
     message(STATUS "Skipping environment variable checks...")
 endif()
+
+# Generate Memory Mapping for Kernels
+MATH(EXPR kernelRange "${MP_KERNEL_REPL} - 1")
+foreach(kernel RANGE "${kernelRange}")
+    MATH(EXPR kernelIndex "${kernel} + 1")
+    set(ConfigKernelMemMap "${ConfigKernelMemMap}sp=MatrixProfileKernelTLF_${kernelIndex}.m_axi_gmem:DDR[${kernel}]\n")
+endforeach()
+
 
 # Set Connectivity Property
 if(MP_EMBEDDED)

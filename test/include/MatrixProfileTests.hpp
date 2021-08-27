@@ -64,7 +64,7 @@ namespace MatrixProfileTests {
 
         static constexpr index_t nColumns = w;
 
-        virtual void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iteration, const InputDataPack *columns, const InputDataPack *rows, OutputDataPack *out) = 0;
+        virtual void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iteration, const InputDataPack *input, OutputDataPack *out) = 0;
     };
 
     template<typename data_t>
@@ -162,7 +162,7 @@ namespace MatrixProfileTests {
             const index_t nOffset = iteration * nColumns;
             const index_t nRows = n - m + 1 - nOffset;
             
-            kernel.MatrixProfileKernelTLF(n, m, iteration, input.data(), input.data(), output.data());
+            kernel.MatrixProfileKernelTLF(n, m, iteration, input.data(), output.data());
 
             // Update Local "Copies" of Aggregates
             for (index_t i = 0; i < nRows; ++i) {

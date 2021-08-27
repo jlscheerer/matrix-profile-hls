@@ -1,4 +1,3 @@
-debug=1
 messageDb=MatrixProfileKernel.mdb
 temp_dir=MatrixProfileKernel.build
 report_dir=MatrixProfileKernel.build/reports
@@ -10,7 +9,5 @@ misc=solution_name=link
 param=compiler.addOutputTypes=sd_card
 
 [connectivity]
-nk=MatrixProfileKernelTLF:1:MatrixProfileKernelTLF_1
-sp=MatrixProfileKernelTLF_1.m_axi_gmem0:${CONNECTIVITY_SP}0
-sp=MatrixProfileKernelTLF_1.m_axi_gmem1:${CONNECTIVITY_SP}1
-sp=MatrixProfileKernelTLF_1.m_axi_gmem2:${CONNECTIVITY_SP}2
+nk=MatrixProfileKernelTLF:${MP_KERNEL_REPL}
+${ConfigKernelMemMap}
