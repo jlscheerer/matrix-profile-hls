@@ -61,7 +61,7 @@ namespace OpenCL{
 
     enum class Access { ReadOnly, WriteOnly, ReadWrite };
 
-    enum class MemoryBank { Unspecified, MemoryBank0, MemoryBank1, MemoryBank2, MemoryBank3 };
+    enum class MemoryBank { MemoryBank0 = 0, MemoryBank1 = 1, MemoryBank2 = 2, MemoryBank3 = 3, Unspecified };
 
     class Program;
 
@@ -227,7 +227,7 @@ namespace OpenCL{
         public:
             Kernel(Program &program, const std::string &name);
 
-            std::chrono::nanoseconds ExecuteTask();
+            void EnqueueTask();
 
             ~Kernel();
         private:
@@ -365,13 +365,8 @@ namespace OpenCL{
             throw RuntimeError("Failed to create kernel with name '" + name + "'");
     }
 
-    std::chrono::nanoseconds Kernel::ExecuteTask(){
+    void Kernel::EnqueueTask(){
         m_program->commandQueue().enqueueTask(m_kernel);
-        // Record time required for execution
-        Timer timer;
-        // m_program->commandQueue().finish();
-        // Return the execution time
-        return timer.Elapsed();
     }
 
     Kernel::~Kernel(){}

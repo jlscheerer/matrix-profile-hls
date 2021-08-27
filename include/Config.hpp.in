@@ -73,6 +73,8 @@ struct OutputDataPack {
         : rowAggregate(rowAggregate), columnAggregate(columnAggregate) {}
 };
 
+static constexpr int kNumKernels = ${MP_KERNEL_REPL};
+
 // "translate" the selected kernel implementation (type) to a readable string
 #define KERNEL_IMPL_NAME "v${MP_KERNEL}"
 #define KERNEL_IMPL_INDEX ${kernel_index}
