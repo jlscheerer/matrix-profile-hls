@@ -6,7 +6,7 @@ The Matrix Profile is a novel data structure with corresponding algorithms (stom
 
 The source files for the different implementation of the compute kernel can be found under [``kernel/MatrixProfileKernelStreamless.cpp``](kernel/MatrixProfileKernelStreamless.cpp) and [``kernel/MatrixProfileKernelStream1D.cpp``](kernel/MatrixProfileKernelStream1D.cpp).
 
-The host application is in [``host/MatrixProfileHost.cpp``](host/MatrixProfileHost.cpp). This repository contains a light-weight OpenCL™ wrapper for the interaction with the FPGA kernel, which is located in [``include/host/OpenCL.hpp``](include/host/OpenCL.hpp).
+The driver application is in [``host/MatrixProfileHost.cpp``](host/MatrixProfileHost.cpp). This repository contains a light-weight OpenCL™ wrapper for the interaction with the FPGA kernel, which is located in [``include/host/OpenCL.hpp``](include/host/OpenCL.hpp).
 
 ## Getting Started
 ### Cloning the repository
@@ -32,7 +32,7 @@ An example of configuring the kernel (starting from the ``root`` directory):
 
 ```bash
 mkdir build && cd build
-cmake .. -DMP_KERNEL=Tiled -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=65536 -DMP_SIZE_M=256 -DMP_SIZE_W=4096 -DMP_SIZE_T=128
+cmake .. -DMP_KERNEL=Tiled -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=65536 -DMP_SIZE_M=256 -DMP_SIZE_W=4096 -DMP_SIZE_T=128 -DMP_KERNEL_REPL=3
 make host
 make compile
 make link
@@ -40,15 +40,16 @@ make link
 
 ### Build Parameters
 
-| **CMake Parameter** | **Description**           | **Values**                         |
-|---------------------|---------------------------|------------------------------------|
-| ``MP_KERNEL``       | Kernel-Implementation     | ``Vanilla``, ``Tiled``             |
-| ``MP_DATA_TYPE``    | Data Type for Computation | ``float``, ``double``              |
-| ``MP_TARGET``       | Compilation Target        | ``sw_emu``, ``hw_emu``, ``hw``     |
-| ``DMP_SIZE_N``      | Length of the Time Series |                                    |
-| ``DMP_SIZE_M``      | Subsequence Length        |                                    |
-| ``DMP_SIZE_W``      | Tile-Size (Host-Side)     |                                    |
-| ``DMP_SIZE_T``      | Tile-Size (Device-Side)   | *only applicable for Tiled-Kernel* |
+| **CMake Parameter** | **Description**               | **Values**                         |
+|---------------------|-------------------------------|------------------------------------|
+| ``MP_KERNEL``       | Kernel-Implementation         | ``Vanilla``, ``Tiled``             |
+| ``MP_DATA_TYPE``    | Data Type for Computation     | ``float``, ``double``              |
+| ``MP_TARGET``       | Compilation Target            | ``sw_emu``, ``hw_emu``, ``hw``     |
+| ``DMP_SIZE_N``      | Length of the Time Series     |                                    |
+| ``DMP_SIZE_M``      | Subsequence Length            |                                    |
+| ``DMP_SIZE_W``      | Tile-Size (Host-Side)         |                                    |
+| ``DMP_SIZE_T``      | Tile-Size (Device-Side)       | *only applicable for Tiled-Kernel* |
+| ``DMP_KERNEL_REPL`` | Number of Kernel Replications |                                    |
 
 For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platforms) see [``CMakeLists.txt``](CMakeLists.txt).
 
