@@ -82,6 +82,12 @@ namespace OpenCL{
             template<typename T, Access access>
             Buffer<T, access> MakeBuffer(MemoryBank memoryBank, size_t size);
 
+	        std::chrono::nanoseconds Finish() {
+	    	    Timer timer;
+		        m_queue.finish();
+		        return timer.Elapsed();
+            }
+
             // Returns the internal OpenCL command queue.
             inline cl::CommandQueue const &commandQueue() const { return m_queue; }
 
