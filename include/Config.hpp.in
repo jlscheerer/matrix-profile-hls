@@ -21,7 +21,6 @@ static constexpr index_t n = ${MP_SIZE_N};
 // subsequence length for the matrix profile
 static constexpr index_t m = ${MP_SIZE_M};
 
-// TODO: pass as input parameter
 // width of diagonal computed in each iteration
 static constexpr index_t w = ${MP_SIZE_W};
 

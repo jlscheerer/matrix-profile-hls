@@ -1,7 +1,7 @@
 /**
- * @file    MatrixProfileKernelStream1D.cpp
+ * @file    MatrixProfileKernelTiled.cpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   Implementation of the Kernel (C++/Vitis HLS) [Stream-1D]
+ * @brief   Implementation of the Kernel (C++/Vitis HLS) [Tiled-Kernel]
  */
 
 #if !defined(TEST_MOCK_SW)

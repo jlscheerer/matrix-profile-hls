@@ -1,18 +1,18 @@
 /**
- * @file    TestStreamlessKernel.cpp
+ * @file    TestVanillaKernel.cpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   Software Tests for Streamless-Kernel
+ * @brief   Software Tests for Vanilla-Kernel
  */
 
 #include "MatrixProfileTests.hpp"
 
 namespace MatrixProfileTests {
 
-    // wrapper struct to have multiple StreamlessKernel instances
+    // wrapper struct to have multiple VanillaKernel instances
     // with different configurations (data_t, index_t, w) this allows
     // for multiple test (without having to recompile)
     template<typename data_t, typename index_t, int w>
-    struct StreamlessKernel: public MatrixProfileKernel<data_t, index_t, w> {
+    struct VanillaKernel: public MatrixProfileKernel<data_t, index_t, w> {
 
         using aggregate_t = typename MatrixProfileKernel<data_t, index_t, w>::aggregate_t;
         using InputDataPack = typename MatrixProfileKernel<data_t, index_t, w>::InputDataPack;
@@ -23,21 +23,21 @@ namespace MatrixProfileTests {
 
         static constexpr index_t nColumns = MatrixProfileKernel<data_t, index_t, w>::nColumns;
 
-        #include "MatrixProfileKernelStreamless.cpp"
+        #include "MatrixProfileKernelVanilla.cpp"
     };
     
-    TEST(TestStreamlessKernel, TestSmall128SynM16W32) {
-        StreamlessKernel<double, int, 32> kernel;
+    TEST(TestVanillaKernel, TestSmall128SynM16W32) {
+        VanillaKernel<double, int, 32> kernel;
         TestMatrixProfileKernel<double, int, 128, 16, 32>(kernel, "test/small128_syn.txt");
     }
 
-    TEST(TestStreamlessKernel, TestBenchmark1024SynM16W32) {
-        StreamlessKernel<double, int, 32> kernel;
+    TEST(TestVanillaKernel, TestBenchmark1024SynM16W32) {
+        VanillaKernel<double, int, 32> kernel;
         TestMatrixProfileKernel<double, int, 1024, 16, 32>(kernel, "test/1024.txt");
     }
     
-    TEST(TestStream1DKernel, TestBenchmark16384SynM128W1024) {
-        StreamlessKernel<double, int, 1024> kernel;
+    TEST(TestVanillaKernel, TestBenchmark16384SynM128W1024) {
+        VanillaKernel<double, int, 1024> kernel;
         TestMatrixProfileKernel<double, int, 16384, 128, 1024>(kernel, "test/16384.txt");
     }
 

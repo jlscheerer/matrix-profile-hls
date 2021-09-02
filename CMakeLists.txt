@@ -26,8 +26,8 @@ set(MP_ROOT_FS "/u/home/raoofy/xilinx-zynqmp-common-v2020.1/rootfs.ext4" CACHE S
 set(MP_KERNEL_IMAGE "/u/home/raoofy/xilinx-zynqmp-common-v2020.1/Image" CACHE STRING "Application settings: Kernel Image")
 
 # Matrix Profile Computation Options
-set(VALID_KERNELS Streamless Stream1D)
-set(MP_KERNEL "Stream1D" CACHE STRING "implementation to use for the matrix profile kernel {Streamless, Stream1D}")
+set(VALID_KERNELS Vanilla Tiled)
+set(MP_KERNEL "Tiled" CACHE STRING "implementation to use for the matrix profile kernel {Vanilla, Tiled}")
 set_property(CACHE MP_KERNEL PROPERTY STRINGS ${VALID_KERNELS})
 
 set(MP_KERNEL_REPL 1 CACHE STRING "number of kernel replications")
@@ -43,7 +43,7 @@ set_property(CACHE MP_INDEX_TYPE PROPERTY STRINGS ${VALID_INDEX_TYPES})
 set(MP_SIZE_N 8192 CACHE STRING "length of the time series data")
 set(MP_SIZE_M 32 CACHE STRING "subsequence length for the matrix profile")
 set(MP_SIZE_W 1024 CACHE STRING "number of diagonals to compute in a single iteration on device")
-set(MP_SIZE_T 128 CACHE STRING "tile-size (only applicable for Stream1D) [assumption: t ≥ m]")
+set(MP_SIZE_T 128 CACHE STRING "tile-size (only applicable for the Tiled-Kernel) [assumption: t ≥ m]")
 
 # Custom option to enable software testing using google-test
 # Not enabled by default has to be explicitly enabled via -DBUILD_TESTS=ON
@@ -59,7 +59,7 @@ endif()
 
 list(FIND VALID_KERNELS ${MP_KERNEL} kernel_index)
 if(kernel_index EQUAL -1)
-    message(FATAL_ERROR "The specified value for 'MP_KERNEL' [\"${MP_KERNEL}\"] is invalid.\nKernel has to be one of 'Streamless', 'Stream1D'.")
+    message(FATAL_ERROR "The specified value for 'MP_KERNEL' [\"${MP_KERNEL}\"] is invalid.\nKernel has to be one of 'Vanilla', 'Tiled'.")
 endif()
 
 if(NOT(${MP_KERNEL_REPL} MATCHES "^[0-9]+$"))
@@ -88,7 +88,7 @@ if(NOT(${MP_SIZE_M} MATCHES "^[0-9]+$") OR ${MP_SIZE_N} LESS ${MP_SIZE_M})
     message(FATAL_ERROR "The specified value for 'MP_SIZE_M' [\"${MP_SIZE_M}\"] is invalid, m has to be numeric and ≤ n!")
 endif()
 
-if(NOT("${MP_KERNEL}" STREQUAL "Streamless") AND (NOT(${MP_SIZE_T} MATCHES "^[0-9]+$")))
+if(NOT("${MP_KERNEL}" STREQUAL "Vanilla") AND (NOT(${MP_SIZE_T} MATCHES "^[0-9]+$")))
     message(FATAL_ERROR "The specified value for 'MP_SIZE_T' [\"${MP_SIZE_T}\"] is invalid, t has to be numeric and ≥ m!")
 endif()
 # /check parameter validity
@@ -142,7 +142,7 @@ configure_file(config/common-config.cfg.in config/common-config.cfg)
 configure_file(config/compile-config.cfg.in config/compile-config.cfg)
 configure_file(config/link-config.cfg.in config/link-config.cfg)
 
-if(NOT("${MP_KERNEL}" STREQUAL "Streamless"))
+if(NOT("${MP_KERNEL}" STREQUAL "Vanilla"))
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/reports/build-info.txt" "[Configuration]\nMP_PLATFORM=${MP_PLATFORM}\nMP_EMBEDDED=${MP_EMBEDDED}\nMP_TARGET=${MP_TARGET}\nMP_QUICK_BUILD=${MP_QUICK_BUILD}\n\nMP_KERNEL=${MP_KERNEL}\nMP_SIZE_N=${MP_SIZE_N}\nMP_SIZE_M=${MP_SIZE_M}\nMP_SIZE_W=${MP_SIZE_W}\nMP_SIZE_T=${MP_SIZE_T}\n\nMP_DATA_TYPE=${MP_DATA_TYPE}\nMP_INDEX_TYPE=${MP_INDEX_TYPE}\n")
 else()
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/reports/build-info.txt" "[Configuration]\nMP_PLATFORM=${MP_PLATFORM}\nMP_EMBEDDED=${MP_EMBEDDED}\nMP_TARGET=${MP_TARGET}\nMP_QUICK_BUILD=${MP_QUICK_BUILD}\n\nMP_KERNEL=${MP_KERNEL}\nMP_SIZE_N=${MP_SIZE_N}\nMP_SIZE_M=${MP_SIZE_M}\nMP_SIZE_W=${MP_SIZE_W}\n\nMP_DATA_TYPE=${MP_DATA_TYPE}\nMP_INDEX_TYPE=${MP_INDEX_TYPE}\n")
@@ -284,15 +284,15 @@ if(BUILD_TESTS)
     include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
     include_directories(${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/include/ ${PROJECT_SOURCE_DIR}/test/include)
 
-    add_executable(testStreamlessKernel "${PROJECT_SOURCE_DIR}/test/TestStreamlessKernel.cpp")
-    target_link_libraries(testStreamlessKernel gtest gtest_main)
+    add_executable(testVanillaKernel "${PROJECT_SOURCE_DIR}/test/TestVanillaKernel.cpp")
+    target_link_libraries(testVanillaKernel gtest gtest_main)
 
-    add_executable(testStream1DKernel "${PROJECT_SOURCE_DIR}/test/TestStream1DKernel.cpp")
-    target_link_libraries(testStream1DKernel gtest gtest_main)
+    add_executable(testTiledKernel "${PROJECT_SOURCE_DIR}/test/TestTiledKernel.cpp")
+    target_link_libraries(testTiledKernel gtest gtest_main)
 
     # This is so you can do 'make test' to see all tests run, instead of
     # manually running the executable runUnitTests to see those specific tests.
-    add_test(NAME TestStreamlessKernel COMMAND testStreamlessKernel)
-    add_test(NAME TestStream1DKernel COMMAND testStream1DKernel)
+    add_test(NAME TestVanillaKernel COMMAND testVanillaKernel)
+    add_test(NAME TestTiledKernel COMMAND testTiledKernel)
 endif()
 

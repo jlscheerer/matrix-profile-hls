@@ -4,7 +4,7 @@ This repository includes multiple Vitis™ HLS implementations of the Matrix Pro
 
 The Matrix Profile is a novel data structure with corresponding algorithms (stomp, regimes, motifs, etc.) developed by the [Keogh](https://www.cs.ucr.edu/~eamonn/MatrixProfile.html) and [Mueen](https://www.cs.unm.edu/~mueen/) research groups at UC-Riverside and the University of New Mexico. 
 
-The source files for the different implementation of the compute kernel can be found under [``kernel/MatrixProfileKernelStreamless.cpp``](kernel/MatrixProfileKernelStreamless.cpp) and [``kernel/MatrixProfileKernelStream1D.cpp``](kernel/MatrixProfileKernelStream1D.cpp).
+The source files for the different implementation of the compute kernel can be found under [``kernel/MatrixProfileKernelVanilla.cpp``](kernel/MatrixProfileKernelVanilla.cpp) and [``kernel/MatrixProfileKernelTiled.cpp``](kernel/MatrixProfileKernelTiled.cpp).
 
 The driver application is in [``host/MatrixProfileHost.cpp``](host/MatrixProfileHost.cpp). This repository contains a light-weight OpenCL™ wrapper for the interaction with the FPGA kernel, which is located in [``include/host/OpenCL.hpp``](include/host/OpenCL.hpp).
 
@@ -72,7 +72,7 @@ cmake .. -DSKIP_CHECKS=ON -DBUILD_TESTS=ON
 make && make test
 ```
 
-The corresponding source files can be found under [``test/TestStreamlessKernel.cpp``](test/TestStreamlessKernel.cpp) and [``test/TestStream1DKernel.cpp``](test/TestStream1DKernel.cpp).
+The corresponding source files can be found under [``test/TestVanillaKernel.cpp``](test/TestVanillaKernel.cpp) and [``test/TestTiledKernel.cpp``](test/TestTiledKernel.cpp).
 
 ## Bugs
 If you experience bugs, or have suggestions for improvements, please use the issue tracker to report them.

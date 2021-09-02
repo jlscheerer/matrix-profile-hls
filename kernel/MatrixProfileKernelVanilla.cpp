@@ -1,7 +1,7 @@
 /**
- * @file    MatrixProfileKernelStreamless.cpp
+ * @file    MatrixProfileKernelVanilla.cpp
  * @author  Jan Luca Scheerer (scheerer@cs.tum.edu)
- * @brief   Implementation of the Kernel (C++/Vitis HLS) [Streamless]
+ * @brief   Implementation of the Kernel (C++/Vitis HLS) [Vanilla-Kernel]
  */
 
 #if !defined(TEST_MOCK_SW)
