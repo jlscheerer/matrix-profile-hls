@@ -181,7 +181,7 @@ void DiagonalComputeElement(const index_t n, const index_t m,
             const bool exclusionZone = rowIndex > columnIndex - m / 4;
             const bool inBounds = columnInBounds && !exclusionZone;
 
-            // In case the values in not relevant take 0 (will not affect the result)
+            // In case the computed value is not relevant take 0 (will not affect the result)
             const data_t P = inBounds ? static_cast<data_t>(QT[j] * row.inv * column.inv) : static_cast<data_t>(0);
 
             // Use partial reduction of rowAggregates to break loop dependency
