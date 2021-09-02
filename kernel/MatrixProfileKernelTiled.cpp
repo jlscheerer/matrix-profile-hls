@@ -14,9 +14,20 @@
 #include "kernel/TreeReduce.hpp"
 #include "kernel/DataPacks.hpp"
 
+#if !defined(TEST_MOCK_SW)
+    #include "Config.hpp"
+    #include "kernel/MatrixProfileKernel.hpp"
+
+    #include "hls_math.h"
+#endif
+
+#include "kernel/Stream.hpp"
+#include "kernel/TreeReduce.hpp"
+#include "kernel/DataPacks.hpp"
+
 void MemoryToStream(const index_t n, const index_t m, const index_t iteration,
-                    const InputDataPack *columns,
-                    Stream<InputDataPack> &scatter, Stream<ComputePack> &compute) {
+                    const InputDataPack *input, Stream<InputDataPack> &scatter, 
+                    Stream<ComputePack> &compute) {
     const index_t nOffset = iteration * nColumns;
     const index_t nRows = n - m + 1 - nOffset;
 
@@ -25,7 +36,7 @@ void MemoryToStream(const index_t n, const index_t m, const index_t iteration,
         #pragma HLS PIPELINE II=1
 
         const index_t columnIndex = nOffset + i;
-        const InputDataPack read = (columnIndex < n - m + 1) ? columns[columnIndex]
+        const InputDataPack read = (columnIndex < n - m + 1) ? input[columnIndex]
                                                              : InputDataPack(0);
         scatter.write(read);
     }
@@ -35,14 +46,14 @@ void MemoryToStream(const index_t n, const index_t m, const index_t iteration,
         #pragma HLS PIPELINE II=1
 
         // rows will by design always by in bounds!
-        const InputDataPack readRow = columns[i];
+        const InputDataPack readRow = input[i];
         const DataPack rowData(readRow.df, readRow.dg, readRow.inv);
         const aggregate_t rowAggregate = aggregate_t_init;
 
         const index_t columnIndex = nOffset + nColumns + i;
         const bool inBounds = columnIndex < n - m + 1;
 
-        const InputDataPack readColumn = inBounds ? columns[columnIndex]
+        const InputDataPack readColumn = inBounds ? input[columnIndex]
                                                   : InputDataPack(0);
         const DataPack columnData(readColumn.df, readColumn.dg, readColumn.inv);
         const aggregate_t columnAggregate = aggregate_t_init;
@@ -82,9 +93,11 @@ void ProcessingElement(const index_t n, const index_t m,
         } else scatter_out.write(read);
     }
 
-    // TODO: Comment w >= rowReduceD2
+
     constexpr int rowReduceD1 = 8;
     constexpr int rowReduceD2 = 8;
+
+    // TODO: Comment w >= rowReduceD2
     aggregate_t rowReduce[rowReduceD1][rowReduceD2];
     #pragma HLS ARRAY_PARTITION variable=rowReduce dim=2 complete
 
