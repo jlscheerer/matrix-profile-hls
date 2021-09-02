@@ -35,7 +35,6 @@ using OpenCL::MemoryBank;
 // Allocate Host-Side Memory (needs to be statically allocated!)
 static std::array<double, n> host_T;
 static std::array<InputDataPack, n - m + 1> host_input;
-// static std::array<OutputDataPack, n - m + 1> host_output;
 static std::array<std::array<OutputDataPack, n - m + 1>, kNumKernels> host_output;
 
 // Intermediate Results Storing column- & row-wise aggregates
@@ -44,22 +43,6 @@ static std::array<aggregate_t, n - m + 1> rowAggregates, columnAggregates;
 // Resulting Matrix Profile and corresponding Matrix Profile Index
 static std::array<double, n - m + 1> MP;
 static std::array<index_t, n - m + 1> MPI;
-
-void ProcessIteration(int iteration) {
-	const index_t nOffset = iteration * nColumns;
-    const index_t nRows = n - m + 1 - nOffset;
-
-	for (index_t i = 0; i < nRows; ++i) {
-        aggregate_t prevRow = iteration > 0 ? rowAggregates[i] : aggregate_t_init;
-        aggregate_t prevCol = iteration > 0 ? columnAggregates[i + nOffset] : aggregate_t_init;
-
-        aggregate_t currRow = host_output[iteration % kNumKernels][i].rowAggregate;
-        aggregate_t currCol = host_output[iteration % kNumKernels][i].columnAggregate;
-
-        rowAggregates[i] = currRow.value > prevRow.value ? currRow : prevRow;
-        columnAggregates[i + nOffset] = currCol.value > prevCol.value ? currCol : prevCol;
-    }
-}
 
 /**
  * @param xclbin full path to the (.xclbin) binary
@@ -85,32 +68,33 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     Log<LogLevel::Verbose>("Initializing OpenCL context...");
     OpenCL::Context context;
 
-    // These commands will allocate memory on the Device. OpenCL::Buffer
-    // objects can be used to reference the memory locations on the device.
     Log<LogLevel::Verbose>("Initializing Memory...");
 
+    // These commands will allocate memory on the Device. OpenCL::Buffer
+    // objects can be used to reference the memory locations on the device.
     std::vector<OpenCL::Buffer<InputDataPack, Access::ReadOnly>> bufferInput;
     std::vector<OpenCL::Buffer<OutputDataPack, Access::WriteOnly>> bufferOutput;
 
     for (index_t i = 0; i < kNumKernels; ++i) {
         const MemoryBank bank = static_cast<MemoryBank>(i);
-	    bufferInput.push_back(context.MakeBuffer<InputDataPack, Access::ReadOnly>(bank, n - m + 1));
-	    bufferOutput.push_back(context.MakeBuffer<OutputDataPack, Access::WriteOnly>(bank, n - m + 1));
+        bufferInput.push_back(context.MakeBuffer<InputDataPack, Access::ReadOnly>(bank, n - m + 1));
+        bufferOutput.push_back(context.MakeBuffer<OutputDataPack, Access::WriteOnly>(bank, n - m + 1));
     }
 
     Log<LogLevel::Verbose>("Programming device...");
     OpenCL::Program program{context.MakeProgram(xclbin)};
 
     Log<LogLevel::Verbose>("Copying memory to device...");
-    
-    for (index_t i = 0; i < kNumKernels; ++i) {
-	    bufferInput[i].CopyFromHost(host_input.cbegin(), host_input.cend());
-    }
-    context.commandQueue().finish();
 
+    for (index_t i = 0; i < kNumKernels; ++i)
+        bufferInput[i].CopyFromHost(host_input.cbegin(), host_input.cend());
+    // After enqueing write operations, we can now actually perform them
+    context.Finish();
+
+    // Create kNumKernel Kernel Instances
     std::vector<OpenCL::Kernel> kernels;
     for (index_t i = 0; i < kNumKernels; ++i)
-	    kernels.emplace_back(program, KernelTLF, i + 1);
+        kernels.emplace_back(program, KernelTLF, i + 1);
 
     Log<LogLevel::Verbose>("Starting Kernel Execution(s)...");
 
@@ -119,39 +103,37 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
         const index_t nOffset = iteration * nColumns;
         const index_t nRows = n - m + 1 - nOffset;
 
-        // Cyclically reference different Kernels 
+        // Cyclically reference different Kernels
         OpenCL::Kernel &kernel = kernels[iteration % kNumKernels];
 
         // Specify Kernel Arguments for the current Iteration
-	    kernel.SetKernelArguments(0, n, m, iteration, bufferInput[iteration % kNumKernels], 
+        kernel.SetKernelArguments(0, n, m, iteration, bufferInput[iteration % kNumKernels],
                                   bufferOutput[iteration % kNumKernels]);
 
-        // TODO: Update Timings to reflect actual computation
-        // profile.Push("2. FPGA Computation [" + (std::string(KERNEL_IMPL_NAME)) + ", w=" + std::to_string(w) + "]",
-        //             KernelTLF + " [iteration=" + std::to_string(iteration) + ", nRows=" + std::to_string(nRows) + "]", kernel.ExecuteTask());
         kernel.EnqueueTask();
 
         // Copy back the intermediate result (enqueue)
         bufferOutput[iteration % kNumKernels].CopyToHost(host_output[iteration % kNumKernels].data(), nRows);
 
-        // Once all Kernel jobs have been enqeued we finish the 
+        // Once all Kernel jobs have been enqeued we finish the
         // Iteration and Process the Results
         if (iteration % kNumKernels == kNumKernels - 1) {
-            context.commandQueue().finish();
-            // Process the Operations (Could be done asychronously!)
-            for (index_t i = kNumKernels - 1; i >= 0; --i) {
-                ProcessIteration(iteration - i);
-            }
+            profile.Push("2. FPGA Computation [" + (std::string(KERNEL_IMPL_NAME)) + ", w=" + std::to_string(w) + "]",
+                         KernelTLF + " [iteration=" + std::to_string(iteration - (kNumKernels - 1)) + "-" + std::to_string(iteration) + "]", context.Finish());
+            // Process the results (Could be done asychronously!) by integrating
+            // them into the local aggregate buffers
+            for (index_t i = kNumKernels - 1; i >= 0; --i)
+                HostSideComputation::UpdateAggregates(profile, iteration - i, host_output, rowAggregates, columnAggregates);
         }
     }
 
     // In case kNumKernels does not divide number of iterations
     // perform work for excess iterations (as tasks have not been finished)
     if (nIterations % kNumKernels != 0) {
-        context.commandQueue().finish();
-        for (int i = 0; i < nIterations % kNumKernels; ++i) {
-            ProcessIteration(nIterations - 1 - i);
-        }
+        profile.Push("2. FPGA Computation [" + (std::string(KERNEL_IMPL_NAME)) + ", w=" + std::to_string(w) + "]",
+                     KernelTLF + " [iteration=" + std::to_string(nIterations - ((nIterations % kNumKernels) - 1)) + "-" + std::to_string(nIterations - 1) + "]", context.Finish());
+        for (index_t i = nIterations % kNumKernels - 1; i >= 0; --i)
+            HostSideComputation::UpdateAggregates(profile, nIterations - 1 - i, host_output, rowAggregates, columnAggregates);
     }
 
     Log<LogLevel::Info>("Kernel Execution Completed Successfully.");
@@ -159,8 +141,6 @@ int RunMatrixProfileKernel(const std::string &xclbin, const std::string &input, 
     Log<LogLevel::Info>("Performing Post-Computation on Host");
     HostSideComputation::PostComputeAggregates(profile, rowAggregates, columnAggregates, MP, MPI);
 
-    // Log<LogLevel::Info>("Converting Pearson Correlation to Euclidean Distance");
-    // HostSideComputation::PearsonCorrelationToEuclideanDistance(host_MP, host_MPE);
     if (output) {
         Log<LogLevel::Verbose>("Saving results (MP/MPI) to file...");
         // Write the Matrix Profile to disk

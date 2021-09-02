@@ -68,5 +68,26 @@ namespace HostSideComputation {
         profile.Push("4. Host-Side [Post-Computation]", time);
     }
 
+
+    void UpdateAggregates(BenchmarkProfile &profile, index_t iteration, std::array<std::array<OutputDataPack, n - m + 1>, kNumKernels> &host_output, 
+                          std::array<aggregate_t, n - m + 1> &rowAggregates, std::array<aggregate_t, n - m + 1> &columnAggregates) {
+        Timer timer;
+        const index_t nOffset = iteration * nColumns;
+        const index_t nRows = n - m + 1 - nOffset;
+
+        for (index_t i = 0; i < nRows; ++i) {
+            aggregate_t prevRow = iteration > 0 ? rowAggregates[i] : aggregate_t_init;
+            aggregate_t prevCol = iteration > 0 ? columnAggregates[i + nOffset] : aggregate_t_init;
+
+            aggregate_t currRow = host_output[iteration % kNumKernels][i].rowAggregate;
+            aggregate_t currCol = host_output[iteration % kNumKernels][i].columnAggregate;
+
+            rowAggregates[i] = currRow.value > prevRow.value ? currRow : prevRow;
+            columnAggregates[i + nOffset] = currCol.value > prevCol.value ? currCol : prevCol;
+        }
+        auto time = timer.Elapsed();
+        profile.Push("3. Host-Side [Update-Aggregates]", "Aggregate_Merge_" + std::to_string(iteration), time);
+    }
+
 }
 
