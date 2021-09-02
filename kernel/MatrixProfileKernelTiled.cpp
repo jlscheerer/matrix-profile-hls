@@ -106,8 +106,10 @@ void DiagonalComputeElement(const index_t n, const index_t m,
     const index_t revStage = (nColumns - 1) / t - stage;
 
     // Buffer to contain the currently relevant column (aggregate) values (act shift registers)
-    DataPack columns[t];
-    aggregate_t columnAggregates[t];
+    // Instead of shifting the column values explicitly like in the "master" branch
+    // We use a "double-buffering" technique
+    DataPack columns[2][t];
+    aggregate_t columnAggregates[2][t];
 
     // QT values of the t-diagonals
     data_t QT[t];
@@ -132,7 +134,7 @@ void DiagonalComputeElement(const index_t n, const index_t m,
         // store it in the internal buffers, otherwise propagate it downstream
         if (i >= afterMe) {
             QT[i - afterMe] = read.QT;
-            columns[i - afterMe] = {read.df, read.dg, read.inv};
+            columns[0][i - afterMe] = {read.df, read.dg, read.inv};
         } else scatter_out.write(read);
     }
 
@@ -146,32 +148,44 @@ void DiagonalComputeElement(const index_t n, const index_t m,
     #pragma HLS ARRAY_PARTITION variable=rowReduce dim=2 complete
 
     // Compute Unit: Main Computation
+    DataPack row, columnBackward, columnForward;
+    aggregate_t rowAggregateBackward, columnAggregateBackward, columnAggregateForward;
+
     MatrixProfileCompute:
     for (index_t i = 0; i < nRows; ++i) {
-        // Read the ComputePack from the upstream neighbor
-        const ComputePack read = compute_in.read();
 
-        // Get the data corresponding to the current row
-        const DataPack row = read.row;
-        const aggregate_t rowAggregateBackward = read.rowAggregate;
-
-        // Get column data from the upstream neighbor
-        // Value needs to be integrated into internal buffer
-        const DataPack columnBackward = read.column;
-        const aggregate_t columnAggregateBackward = read.columnAggregate;
-
-        // Go over all our t-diagonals 
         MatrixProfileTile:
         for (index_t j = 0; j < t; ++j) {
+            #pragma HLS LOOP_FLATTEN
             #pragma HLS PIPELINE II=1
 
-            // Get the column data for the j-th diagonal
-            const DataPack column = columns[j];
+            // Get the current column-wise data from the correct buffer
+            const DataPack column = columns[i % 2][j];
+
+            // If we are at the beginning of the current iteration, integrate values from our upstream neighbor
+            if (j == 0) {
+                // Read the ComputePack from the upstream neighbor
+                const ComputePack read = compute_in.read();
+
+                // Get the data corresponding to the current row
+                row = read.row;
+                rowAggregateBackward = read.rowAggregate;
+
+                 // Get column data from the upstream neighbor
+                // Value needs to be integrated into internal buffer
+                columnBackward = read.column;
+                columnAggregateBackward = read.columnAggregate;
+                columnForward = column;
+            }
+
+            // Shift columns backward by writing to previous position of second buffer
+            // directly integrate the value obtained from our upstream neighbor (columnBackward)
+            columns[(i + 1) % 2][(t + j - 1) % t] = (j == 0) ? columnBackward : column;
 
             // Apply the SCAMP update formulation
             QT[j] += row.df * column.dg + column.df * row.dg;
-            
-            // Calculate corresponding row and column indices
+
+            // Determine current row- and column indices
             const index_t rowIndex = i;
             const index_t columnIndex = nOffset + afterMe + i + j;
 
@@ -190,36 +204,33 @@ void DiagonalComputeElement(const index_t n, const index_t m,
             rowReduce[i % rowReduceD1][j % rowReduceD2] = prevRow.value > P ? prevRow
                                                                             : aggregate_t(P, columnIndex);
 
-            // Implicit initialization of columnAggregates & simultaneous update
-            const aggregate_t prevColumn = (i > 0) ? columnAggregates[j]
+            // Get the previous column-wise aggregate from the correct buffer
+            const aggregate_t prevColumn = (i > 0) ? columnAggregates[i % 2][j]
                                                    : aggregate_t_init;
-            columnAggregates[j] = (prevColumn.value > P) ? prevColumn
+
+            // Determine the value to write to columnAggregates buffer.
+            // This will be the maximum of the current value and the previous maximum.
+            const aggregate_t nextColumn = (prevColumn.value > P) ? prevColumn
+                                                                  : aggregate_t(P, rowIndex);
+
+            // Shift columnAggregates backward by writing to previous position of second buffer
+            // directly integrate the value obtained from our upstream neighbor (columnAggregateBackward)
+            columnAggregates[(i + 1) % 2][(t + j - 1) % t] = (j == 0) ? columnAggregateBackward : nextColumn;
+
+            if (j == 0) {
+                // Shift backward across ProcessingElements (i.e., this value will be propagates downstream)
+                columnAggregateForward = (prevColumn.value > P) ? prevColumn
                                                          : aggregate_t(P, rowIndex);
+            }
+
+            // If we are at the end of the current computation, propagate values to our downstream neighbor
+            if (j == t - 1) {
+                const aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, rowReduceD2>(rowReduce[i % rowReduceD1]);
+
+                // Propagate Values along the pipeline
+                compute_out.write({row, rowAggregate, columnForward, columnAggregateForward});
+            }
         }
-
-        // determine the row-wise aggregate using TreeReduction
-        const aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, rowReduceD2>(rowReduce[i % rowReduceD1]);
-
-        // values to forward to downstream neighbor
-        const DataPack columnForward = columns[0];
-        const aggregate_t columnAggregateForward = columnAggregates[0];
-
-        // shift the current column data to the left (i.e. backwards)
-        // (the "experimental" branch contains a version where this shift 
-        //  is integrated into the main computation loop)
-        MatrixProfileShift:
-        for (index_t j = 0; j < t - 1; ++j) {
-            #pragma HLS PIPELINE II=1
-
-            columns[j] = columns[j + 1];
-            columnAggregates[j] = columnAggregates[j + 1];
-        }
-        // integrate values from our downstream neighbor
-        columns[t - 1] = columnBackward;
-        columnAggregates[t - 1] = columnAggregateBackward;
-
-        // Propagate values to our downstream neighbor
-        compute_out.write({row, rowAggregate, columnForward, columnAggregateForward});
     }
 }
 
