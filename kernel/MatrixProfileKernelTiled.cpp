@@ -283,6 +283,6 @@ void MatrixProfileKernelTLF(const index_t n, const index_t m, const index_t iter
                                scatter[i + 1], compute[i + 1]);
     }
 
-    // Write the result (i.e., obtained aggregates) back to global memory
+    // Write the result (i.e., the obtained aggregates) back to global memory
     StreamToMemory(n, m, iteration, compute[nPE], output);
 }
