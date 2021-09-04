@@ -66,7 +66,7 @@ void MemoryToStream(const index_t n, const index_t m, const index_t iteration,
         #pragma HLS PIPELINE II=2
 
         // Read values corresponding to the i-th row.
-        // Each row is by design allows in-bounds.
+        // Each row is by design in-bounds.
         const InputDataPack readRow = input[i];
         const DataPack rowData(readRow.df, readRow.dg, readRow.inv);
         const aggregate_t rowAggregate = aggregate_t_init;
@@ -76,7 +76,7 @@ void MemoryToStream(const index_t n, const index_t m, const index_t iteration,
         const index_t columnIndex = nOffset + nColumns + i;
         const bool inBounds = columnIndex < n - m + 1;
 
-        // Propagate the . In case the columnIndex is not in bounds, we 
+        // Propagate the column. In case the columnIndex is not in bounds, we 
         // propagate 0. This introduces the described extraneous triangle.
         const InputDataPack readColumn = inBounds ? input[columnIndex]
                                                   : InputDataPack(0);
@@ -102,7 +102,7 @@ void DiagonalComputeElement(const index_t n, const index_t m,
     const index_t nRows = n - m + 1 - nOffset;
 
     // Determine the "reverse" stage, i.e. map the first Processing 
-    // Element to the greatest index
+    // Element to the greatest index (left-to-right)
     const index_t revStage = (nColumns - 1) / t - stage;
 
     // Buffer to contain the currently relevant column (aggregate) values (act shift registers)
@@ -197,7 +197,7 @@ void DiagonalComputeElement(const index_t n, const index_t m,
                                                          : aggregate_t(P, rowIndex);
         }
 
-        // determine the row-wise aggregate using TreeReduction
+        // determine the row-wise aggregate (from partially reduced rowReduce) using TreeReduction
         const aggregate_t rowAggregate = TreeReduce::Maximum<aggregate_t, rowReduceD2>(rowReduce[i % rowReduceD1]);
 
         // values to forward to downstream neighbor
