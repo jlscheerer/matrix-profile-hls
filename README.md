@@ -32,7 +32,7 @@ An example of configuring the kernel (starting from the ``root`` directory):
 
 ```bash
 mkdir build && cd build
-cmake .. -DMP_KERNEL=Tiled -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=65536 -DMP_SIZE_M=256 -DMP_SIZE_W=4096 -DMP_SIZE_T=128 -DMP_KERNEL_REPL=3
+cmake .. -DMP_KERNEL=Tiled -DMP_TARGET=hw -DMP_DATA_TYPE=double -DMP_SIZE_N=1048576 -DMP_SIZE_M=256 -DMP_SIZE_W=4096 -DMP_SIZE_T=128 -DMP_KERNEL_REPL=3
 make host
 make compile
 make link
@@ -56,9 +56,9 @@ For a more comprehensive list of parameters (e.g., targeting ``EMBEDDED``-Platfo
 Per default the build targets the Alveo U250 acceleration board, but this can be configured using the ``MP_PLATFORM`` CMake parameter.
 
 ### Executing the Kernel
-After having ``build`` the host application and `link`ed the Kernel, execute the Kernel on input [``data/binary/65536.tsb``](data/binary/65536.tsb) (run this in the ``build`` directory) via:
+After having ``build`` the host application and `link`ed the Kernel, execute the Kernel on input [``data/binary/1048576.tsb``](data/binary/1048576.tsb) (run this in the ``build`` directory) via:
 ```bash
-./MatrixProfileHost -b MatrixProfileKernel.xclbin -i ../data/binary/65536.tsb --verbose
+./MatrixProfileHost -b MatrixProfileKernel.xclbin -i ../data/binary/1048576.tsb --verbose
 ```
 A list of example datasets as well as instruction on how to use your own dataset can be found [here](data/).
 
